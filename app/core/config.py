@@ -1,10 +1,27 @@
+"""
+app/core/config.py — Configuración
+----------------------------------
+
+QUÉ ES
+    Lee variables del entorno / archivo `.env` y las expone como `settings`.
+
+POR QUÉ EXISTE
+    Evita hardcodear contraseñas, URLs y secretos en el código.
+    Cambias `.env` y el comportamiento cambia, sin tocar Python.
+
+PARA LA BD DESACOPLADA
+    DATABASE_URL es el "cable" hacia Postgres:
+      - En tu PC:        localhost:5432
+      - En Docker Compose (servicio api): host `db` (lo pone docker-compose.yml)
+"""
+
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """Valores tipados. Si falta una variable, usa el default de abajo."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -35,6 +52,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> list[str]:
+        """Parte la cadena CORS_ORIGINS en una lista para el middleware."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
     @property
@@ -44,6 +62,7 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Lee el entorno una vez por proceso (más eficiente)."""
     return Settings()
 
 
