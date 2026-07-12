@@ -11,7 +11,8 @@ POR QUÉ EXISTE
     falla con "Connection refused" aunque la BD vaya a estar bien 3 segundos después.
 
 QUÉ HACE
-    Cada segundo ejecuta `SELECT 1` usando DATABASE_URL del .env.
+    Cada segundo ejecuta `SELECT 1` usando settings.DATABASE_URL
+(armada desde POSTGRES_* en app.core.config, o override si existe).
     Si conecta → imprime OK y sale con código 0.
     Si tras ~30 intentos no conecta → sale con código 1 (error).
 

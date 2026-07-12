@@ -183,7 +183,7 @@ Copia `.env.example` a `.env` y ajusta los valores. **No subas `.env` al reposit
 
 | Variable       | Descripción                                                      |
 | -------------- | ---------------------------------------------------------------- |
-| `DATABASE_URL` | URL de conexión PostgreSQL (API → BD desacoplada)                |
+| `POSTGRES_*`   | Piezas de conexión a Postgres (la URL se arma sola en `config.py`) |
 | `SECRET_KEY`   | Clave para tokens JWT                                            |
 | `CORS_ORIGINS` | Orígenes permitidos del frontend (Vite: `http://localhost:5173`) |
 
