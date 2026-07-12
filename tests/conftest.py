@@ -1,13 +1,5 @@
 """
 tests/conftest.py — Fixtures compartidas (Arrange del patrón AAA)
-=================================================================
-
-Pirámide de tests (ver docs/TESTING.md):
-  - Unitarios: usan `db_session` (SQLite en memoria) sin HTTP.
-  - Integración API: usan `client` + override de `get_db`.
-  - Integration Postgres / E2E: marcados y omitidos por defecto.
-
-Markers registrados en pyproject.toml: unit, integration, e2e.
 """
 
 from __future__ import annotations
@@ -21,14 +13,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models  # noqa: F401 — registra tablas en Base.metadata
+import app.models  # noqa: F401
 from app.api.deps import get_db
 from app.db.base import Base
 from app.main import app
+from app.repositories.user import UserRepository
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Asegura markers conocidos aunque se ejecute fuera de pyproject."""
     config.addinivalue_line("markers", "unit: test unitario aislado (rápido)")
     config.addinivalue_line(
         "markers",
@@ -39,7 +31,6 @@ def pytest_configure(config: pytest.Config) -> None:
 
 @pytest.fixture()
 def db_session() -> Generator[Session, None, None]:
-    """Arrange: sesión SQLite aislada por test (unitarios y API)."""
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -58,8 +49,6 @@ def db_session() -> Generator[Session, None, None]:
 
 @pytest.fixture()
 def client(db_session: Session) -> Generator[TestClient, None, None]:
-    """Arrange: TestClient con get_db apuntando a la BD de test."""
-
     def override_get_db() -> Generator[Session, None, None]:
         try:
             yield db_session
@@ -74,7 +63,6 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
 
 @pytest.fixture()
 def registered_user(client: TestClient) -> dict:
-    """Arrange: usuario creado vía /auth/register."""
     payload = {
         "nombres": "Ana",
         "apellidos": "Pérez",
@@ -91,7 +79,6 @@ def registered_user(client: TestClient) -> dict:
 
 @pytest.fixture()
 def auth_headers(client: TestClient, registered_user: dict) -> dict[str, str]:
-    """Arrange: header Bearer tras login."""
     response = client.post(
         "/api/v1/auth/login",
         data={
@@ -105,8 +92,23 @@ def auth_headers(client: TestClient, registered_user: dict) -> dict[str, str]:
 
 
 @pytest.fixture()
+def admin_headers(
+    client: TestClient,
+    db_session: Session,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> dict[str, str]:
+    """Mismo usuario que auth_headers, promovido a admin en BD."""
+    user = UserRepository.get_by_usuario(db_session, registered_user["usuario"])
+    assert user is not None
+    user.rol = "admin"
+    UserRepository.update(db_session, user)
+    db_session.commit()
+    return auth_headers
+
+
+@pytest.fixture()
 def postgres_url() -> str | None:
-    """URL Postgres para integration/e2e; None si no está habilitado."""
     if os.getenv("RUN_INTEGRATION", "").lower() not in {"1", "true", "yes"}:
         return None
     return os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL")

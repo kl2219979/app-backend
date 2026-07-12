@@ -62,7 +62,7 @@ def test_list_and_delete(db_session):
     CategoryService.delete(db_session, cat.id)
 
     # Assert
-    assert any(c.id == cat.id for c in listed)
+    assert any(c.id == cat.id for c in listed.items)
     with pytest.raises(HTTPException) as exc:
         CategoryService.get(db_session, cat.id)
     assert exc.value.status_code == 404

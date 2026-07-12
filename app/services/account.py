@@ -1,9 +1,5 @@
 """
 app/services/account.py — Reglas de negocio de cuentas
-======================================================
-
-- El dueño de la cuenta es siempre el usuario del JWT (no confiar en user_id del body).
-- Listar / obtener / actualizar / borrar solo sobre cuentas propias.
 """
 
 from __future__ import annotations
@@ -14,13 +10,28 @@ from sqlalchemy.orm import Session
 from app.models.account import Account
 from app.models.user import User
 from app.repositories.account import AccountRepository
-from app.schemas.account import AccountCreate, AccountUpdate
+from app.schemas.account import AccountCreate, AccountResponse, AccountUpdate
+from app.schemas.pagination import Page
 
 
 class AccountService:
     @staticmethod
-    def list_mine(db: Session, current_user: User) -> list[Account]:
-        return AccountRepository.list_by_user(db, current_user.id)
+    def list_mine(
+        db: Session,
+        current_user: User,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Page[AccountResponse]:
+        items, total = AccountRepository.list_filtered(
+            db, user_id=current_user.id, limit=limit, offset=offset
+        )
+        return Page[AccountResponse](
+            items=[AccountResponse.model_validate(i) for i in items],
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
 
     @staticmethod
     def get_mine(db: Session, current_user: User, account_id: int) -> Account:

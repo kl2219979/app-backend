@@ -35,8 +35,8 @@ def test_create_and_list_by_category(db_session):
 
     # Assert
     assert created.category_id == cat.id
-    assert len(filtered) == 1
-    assert filtered[0].nombre == "Taxi"
+    assert filtered.total == 1
+    assert filtered.items[0].nombre == "Taxi"
 
 
 def test_list_by_missing_category_raises_404(db_session):

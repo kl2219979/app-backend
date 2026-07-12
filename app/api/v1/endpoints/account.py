@@ -1,28 +1,27 @@
 """
 app/api/v1/endpoints/account.py — CRUD de cuentas (JWT)
-=======================================================
-
-Rutas plurales: /accounts
-Todas requieren Authorization: Bearer <token>
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
 from app.schemas.account import AccountCreate, AccountResponse, AccountUpdate
+from app.schemas.pagination import Page
 from app.services.account import AccountService
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 
-@router.get("", response_model=list[AccountResponse])
+@router.get("", response_model=Page[AccountResponse])
 def list_accounts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> list:
-    return AccountService.list_mine(db, current_user)
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> Page[AccountResponse]:
+    return AccountService.list_mine(db, current_user, limit=limit, offset=offset)
 
 
 @router.get("/{account_id}", response_model=AccountResponse)

@@ -43,8 +43,10 @@ DEPENDENCIAS
 
 from __future__ import annotations
 
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 import bcrypt
 import jwt
@@ -55,6 +57,7 @@ from app.core.config import settings
 # Algoritmo de firma del JWT. HS256 = HMAC + SHA-256 con SECRET_KEY.
 # Simétrico: el mismo secreto firma y verifica (adecuado para una sola API).
 ALGORITHM = "HS256"
+TokenKind = Literal["access", "refresh"]
 
 
 # ---------------------------------------------------------------------------
@@ -116,29 +119,9 @@ def create_access_token(
     extra_claims: dict[str, Any] | None = None,
 ) -> str:
     """
-    Emite un access token JWT firmado.
+    Emite un access token JWT firmado (claim typ=access).
 
-    Parámetros
-    ----------
-    subject:
-        Identidad del usuario (normalmente user.id). Va en el claim `sub`.
-    expires_delta:
-        Vida útil del token. Si es None, usa ACCESS_TOKEN_EXPIRE_MINUTES.
-    extra_claims:
-        Claims adicionales opcionales (ej. {"role": "admin"}). Con cuidado:
-        no pongas datos sensibles; el JWT se puede decodificar (solo la
-        firma garantiza que no fue alterado).
-
-    Retorna
-    -------
-    str:
-        Token compacto (tres partes base64 separadas por puntos).
-
-    Claims estándar que usamos
-    --------------------------
-    - sub: sujeto (id de usuario)
-    - iat: emitido en (unix timestamp)
-    - exp: expira en (unix timestamp)
+    Claims: sub, iat, exp, typ.
     """
     now = datetime.now(UTC)
     expire = now + (
@@ -151,6 +134,7 @@ def create_access_token(
         "sub": str(subject),
         "iat": now,
         "exp": expire,
+        "typ": "access",
     }
     if extra_claims:
         payload.update(extra_claims)
@@ -160,30 +144,33 @@ def create_access_token(
 
 def decode_access_token(token: str) -> dict[str, Any]:
     """
-    Valida la firma y la expiración del JWT; devuelve el payload.
-
-    Lanza
-    -----
-    jwt.exceptions.InvalidTokenError (y subclases: ExpiredSignatureError, etc.)
-        Si el token es inválido, fue manipulado o expiró.
-
-    El caller (deps.get_current_user) traduce eso a HTTP 401.
+    Valida firma/expiración y exige typ=access (o ausente por compatibilidad).
     """
-    return jwt.decode(
+    payload = jwt.decode(
         token,
         settings.SECRET_KEY,
         algorithms=[ALGORITHM],
     )
+    typ = payload.get("typ", "access")
+    if typ != "access":
+        raise InvalidTokenError("Not an access token")
+    return payload
 
 
 def get_subject_from_token(token: str) -> str:
-    """
-    Atajo: decodifica el token y devuelve el claim `sub` (id de usuario).
-
-    Lanza InvalidTokenError si el token no es válido o no trae `sub`.
-    """
+    """Decodifica el access token y devuelve el claim `sub`."""
     payload = decode_access_token(token)
     subject = payload.get("sub")
     if subject is None or subject == "":
         raise InvalidTokenError("Token without subject")
     return str(subject)
+
+
+def generate_refresh_token() -> str:
+    """Token opaco de alto entropía (se guarda solo el hash en BD)."""
+    return secrets.token_urlsafe(48)
+
+
+def hash_refresh_token(raw_token: str) -> str:
+    """SHA-256 hex del refresh token (lookup seguro sin guardar el claro)."""
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()

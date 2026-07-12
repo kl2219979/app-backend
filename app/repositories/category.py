@@ -1,19 +1,16 @@
 """
 app/repositories/category.py — Acceso a datos de Category
-=========================================================
 """
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.category import Category
 
 
 class CategoryRepository:
-    """CRUD de categories."""
-
     @staticmethod
     def get_by_id(db: Session, category_id: int) -> Category | None:
         return db.get(Category, category_id)
@@ -24,9 +21,24 @@ class CategoryRepository:
 
     @staticmethod
     def list_all(db: Session) -> list[Category]:
-        return list(
-            db.scalars(select(Category).order_by(Category.nombre.asc())).all()
+        items, _ = CategoryRepository.list_filtered(db, limit=10_000, offset=0)
+        return items
+
+    @staticmethod
+    def list_filtered(
+        db: Session,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[Category], int]:
+        base = select(Category)
+        total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+        items = list(
+            db.scalars(
+                base.order_by(Category.nombre.asc()).limit(limit).offset(offset)
+            ).all()
         )
+        return items, int(total)
 
     @staticmethod
     def create(db: Session, category: Category) -> Category:

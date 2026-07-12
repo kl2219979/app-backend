@@ -44,8 +44,9 @@ def test_list_mine_only_own_accounts(db_session):
     result = AccountService.list_mine(db_session, owner)
 
     # Assert
-    assert len(result) == 1
-    assert result[0].id == mine.id
+    assert result.total == 1
+    assert len(result.items) == 1
+    assert result.items[0].id == mine.id
 
 
 def test_get_mine_raises_404_for_foreign_account(db_session):

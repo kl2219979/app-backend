@@ -30,7 +30,14 @@
 #   id (PK)
 #   nombres, apellidos, fecha_nacimiento, genero
 #   correo (unique), usuario (unique), contrasena_hash
+#   rol ("user" | "admin")
 #   creado_en
+#
+# refresh_tokens
+#   id (PK)
+#   user_id (FK → users.id, CASCADE)
+#   token_hash (unique, SHA-256 del refresh)
+#   expires_at, creado_en, revoked_at
 #
 # accounts
 #   id (PK)

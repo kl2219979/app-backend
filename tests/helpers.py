@@ -31,6 +31,7 @@ def make_user(
     correo: str = "user@example.com",
     usuario: str = "user1",
     contrasena: str = "secreto123",
+    rol: str = "user",
 ) -> User:
     user = User(
         nombres="Test",
@@ -40,6 +41,7 @@ def make_user(
         correo=correo,
         usuario=usuario,
         contrasena_hash=hash_password(contrasena),
+        rol=rol,
         creado_en=_now(),
     )
     db.add(user)

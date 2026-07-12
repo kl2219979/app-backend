@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     # --- Seguridad ---
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
 
     # --- CORS: orígenes separados por coma en el .env ---
     CORS_ORIGINS: str = "http://localhost:5173"

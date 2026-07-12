@@ -10,20 +10,33 @@ from sqlalchemy.orm import Session
 from app.models.sub_category import SubCategory
 from app.repositories.category import CategoryRepository
 from app.repositories.sub_category import SubCategoryRepository
-from app.schemas.sub_category import SubCategoryCreate, SubCategoryUpdate
+from app.schemas.pagination import Page
+from app.schemas.sub_category import SubCategoryCreate, SubCategoryResponse, SubCategoryUpdate
 
 
 class SubCategoryService:
     @staticmethod
-    def list_all(db: Session, category_id: int | None = None) -> list[SubCategory]:
-        if category_id is not None:
-            if CategoryRepository.get_by_id(db, category_id) is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Categoría no encontrada",
-                )
-            return SubCategoryRepository.list_by_category(db, category_id)
-        return SubCategoryRepository.list_all(db)
+    def list_all(
+        db: Session,
+        *,
+        category_id: int | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Page[SubCategoryResponse]:
+        if category_id is not None and CategoryRepository.get_by_id(db, category_id) is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Categoría no encontrada",
+            )
+        items, total = SubCategoryRepository.list_filtered(
+            db, category_id=category_id, limit=limit, offset=offset
+        )
+        return Page[SubCategoryResponse](
+            items=[SubCategoryResponse.model_validate(i) for i in items],
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
 
     @staticmethod
     def get(db: Session, sub_category_id: int) -> SubCategory:

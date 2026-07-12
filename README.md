@@ -10,7 +10,7 @@ Arquitectura: la base de datos vive desacoplada en su propio contenedor; el back
 > Auth (hash + JWT): [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md).  
 > Repositories: [`docs/REPOSITORIOS.md`](docs/REPOSITORIOS.md).  
 > Tests (patrón AAA): [`docs/TESTING.md`](docs/TESTING.md).  
-> Hoja de ruta (pasos 1–7): [`docs/HOJA_RUTA.md`](docs/HOJA_RUTA.md).
+> Hoja de ruta (pasos 1–8): [`docs/HOJA_RUTA.md`](docs/HOJA_RUTA.md).
 
 ## Equipo
 
@@ -174,12 +174,12 @@ docker compose up db -d
 # Seeds (categorías iniciales, idempotente)
 python scripts/seed.py
 
+# Promover admin (catálogo categories/subcategories)
+python scripts/promote_admin.py ana95
+
 # Tests
-pytest -q                 # suite diaria (unit + API smoke)
-pytest -m unit -q         # solo unitarios
-pytest -m integration -q  # smokes API
-# Postgres opt-in: RUN_INTEGRATION=1 TEST_DATABASE_URL=... pytest tests/integration
-# E2E opt-in:     RUN_E2E=1 E2E_BASE_URL=http://localhost:8000 pytest -m e2e
+pytest -q
+pytest -q -m "not e2e" --cov=app --cov-fail-under=70
 
 # Linter
 ruff check app tests
@@ -189,20 +189,31 @@ CI en GitHub Actions (`.github/workflows/ci.yml`): Ruff + Pytest en cada push/PR
 
 Guía completa (pirámide, AAA, markers, política PR): [`docs/TESTING.md`](docs/TESTING.md).
 
-### Listado de transacciones (paginado)
+### Auth (tokens)
 
 ```http
-GET /api/v1/transactions?limit=20&offset=0&account_id=1&tipo=gasto&date_from=2026-01-01
-Authorization: Bearer <token>
+POST /api/v1/auth/login          → access_token + refresh_token
+POST /api/v1/auth/refresh        { "refresh_token": "..." }
+POST /api/v1/auth/logout         Bearer + opcional { "refresh_token" }
 ```
 
-Respuesta:
+### Listados paginados
+
+Accounts, categories, subcategories y transactions responden:
 
 ```json
 { "items": [ ... ], "total": 42, "limit": 20, "offset": 0 }
 ```
 
-`tipo`: `gasto` (resta saldo) o `ingreso` (suma saldo).
+### Reports
+
+```http
+GET /api/v1/reports/summary?date_from=2026-01-01&date_to=2026-12-31
+Authorization: Bearer <token>
+```
+
+`tipo` en transactions: `gasto` (resta saldo) o `ingreso` (suma saldo).
+Categories/subcategories: **escritura solo admin**.
 
 ## Variables de entorno
 

@@ -2,7 +2,8 @@
 Modelo User → tabla `users`.
 
 Relaciones:
-  User 1 ── N Account   (un usuario tiene muchas cuentas bancarias)
+  User 1 ── N Account
+  User 1 ── N RefreshToken
 
 Ver mapa completo: docs/MODELOS.md
 """
@@ -19,6 +20,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.account import Account
+    from app.models.refresh_token import RefreshToken
 
 
 class User(Base):
@@ -35,8 +37,9 @@ class User(Base):
 
     correo: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     usuario: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
-    # Nunca guardar contraseña en texto plano: solo el hash.
     contrasena_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # "user" | "admin" — admin puede mutar el catálogo de categorías.
+    rol: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
 
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -44,11 +47,18 @@ class User(Base):
         nullable=False,
     )
 
-    # Lado "uno" de User → Accounts. back_populates debe coincidir con Account.user
     accounts: Mapped[list[Account]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def is_admin(self) -> bool:
+        return self.rol == "admin"
 
     def __repr__(self) -> str:
-        return f"User(id={self.id}, usuario={self.usuario!r})"
+        return f"User(id={self.id}, usuario={self.usuario!r}, rol={self.rol!r})"

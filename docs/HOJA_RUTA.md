@@ -134,3 +134,31 @@
 #   python scripts/seed.py
 #   docker compose up --build -d   # si usas API en Docker
 #
+# ---------------------------------------------------------------------------
+# Paso 8 — Refresh token, roles admin, paginación general, reports, coverage
+# ---------------------------------------------------------------------------
+# Auth:
+#   login → { access_token, refresh_token, token_type }
+#   POST /auth/refresh  { refresh_token }  (rota el refresh)
+#   POST /auth/logout   Bearer + opcional refresh_token (revoca)
+#   Tabla refresh_tokens (hash SHA-256); users.rol = user|admin
+#
+# Admin:
+#   POST/PUT/DELETE /categories y /subcategories → solo admin
+#   GET sigue abierto a cualquier JWT
+#   Promover: python scripts/promote_admin.py <usuario_o_correo>
+#
+# Paginación unificada (Page):
+#   /accounts  /categories  /subcategories  /transactions
+#   → { items, total, limit, offset }
+#
+# Reports:
+#   GET /reports/summary?account_id=&date_from=&date_to=
+#   → total_ingresos, total_gastos, balance_neto, by_category[]
+#
+# CI:
+#   pytest --cov=app --cov-fail-under=70
+#
+# Fuera de alcance (consciente):
+#   notificaciones, uploads, multi-tenant complejo
+#

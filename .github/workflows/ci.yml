@@ -1,4 +1,4 @@
-# CI — lint + unit/API tests on every push and pull request
+# CI — lint + unit/API tests + coverage gate
 name: CI
 
 on:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    name: Ruff + Pytest
+    name: Ruff + Pytest + Coverage
     runs-on: ubuntu-latest
 
     steps:
@@ -30,9 +30,12 @@ jobs:
       - name: Ruff (lint)
         run: ruff check app tests
 
-      - name: Pytest (unit + API smoke; skip opt-in Postgres/E2E)
-        run: pytest -q -m "not e2e"
+      - name: Pytest with coverage gate
+        run: >
+          pytest -q -m "not e2e"
+          --cov=app
+          --cov-report=term-missing
+          --cov-fail-under=70
         env:
-          # Ensure integration Postgres smoke stays skipped in CI.
           RUN_INTEGRATION: "0"
           RUN_E2E: "0"

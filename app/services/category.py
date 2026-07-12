@@ -9,13 +9,25 @@ from sqlalchemy.orm import Session
 
 from app.models.category import Category
 from app.repositories.category import CategoryRepository
-from app.schemas.category import CategoryCreate, CategoryUpdate
+from app.schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate
+from app.schemas.pagination import Page
 
 
 class CategoryService:
     @staticmethod
-    def list_all(db: Session) -> list[Category]:
-        return CategoryRepository.list_all(db)
+    def list_all(
+        db: Session,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Page[CategoryResponse]:
+        items, total = CategoryRepository.list_filtered(db, limit=limit, offset=offset)
+        return Page[CategoryResponse](
+            items=[CategoryResponse.model_validate(i) for i in items],
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
 
     @staticmethod
     def get(db: Session, category_id: int) -> Category:

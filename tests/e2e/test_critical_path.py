@@ -1,13 +1,10 @@
 """
-E2E — pocos caminos críticos contra el stack vivo.
+E2E — camino crítico (opt-in). Requiere API viva + catálogo seed:
 
-Por diseño la pirámide tiene MUY pocos E2E. Este módulo está omitido
-salvo que se active explícitamente:
-
+  python scripts/seed.py
   RUN_E2E=1 E2E_BASE_URL=http://localhost:8000 pytest -m e2e
 
-Flujo cubierto:
-  health → register → login → create account → create category/sub → transaction
+Flujo: health → register → login → account → usar categoría seed → transaction → report
 """
 
 from __future__ import annotations
@@ -29,7 +26,6 @@ def e2e_base_url() -> str:
 
 
 def test_critical_money_path(e2e_base_url: str):
-    # Arrange
     suffix = uuid.uuid4().hex[:8]
     register_payload = {
         "nombres": "E2E",
@@ -42,11 +38,9 @@ def test_critical_money_path(e2e_base_url: str):
     }
 
     with httpx.Client(base_url=e2e_base_url, timeout=30.0) as client:
-        # Act — health
         health = client.get("/api/v1/health")
         assert health.status_code == 200, health.text
 
-        # Act — register + login
         reg = client.post("/api/v1/auth/register", json=register_payload)
         assert reg.status_code == 201, reg.text
 
@@ -58,46 +52,46 @@ def test_critical_money_path(e2e_base_url: str):
             },
         )
         assert login.status_code == 200, login.text
-        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        body = login.json()
+        assert "refresh_token" in body
+        headers = {"Authorization": f"Bearer {body['access_token']}"}
 
-        # Act — account + taxonomy + transaction
         account = client.post(
             "/api/v1/accounts",
-            json={"banco": "E2E Bank", "tipo": "ahorros", "moneda": "COP", "saldo": "1"},
+            json={"banco": "E2E Bank", "tipo": "ahorros", "moneda": "COP", "saldo": "100"},
             headers=headers,
         )
         assert account.status_code == 201, account.text
 
-        category = client.post(
-            "/api/v1/categories",
-            json={"nombre": f"E2ECat_{suffix}", "descripcion": "e2e"},
-            headers=headers,
-        )
-        assert category.status_code == 201, category.text
+        cats = client.get("/api/v1/categories?limit=5", headers=headers)
+        assert cats.status_code == 200, cats.text
+        assert cats.json()["total"] >= 1, "Ejecuta python scripts/seed.py antes del E2E"
+        category = cats.json()["items"][0]
 
-        sub = client.post(
-            "/api/v1/subcategories",
-            json={
-                "category_id": category.json()["id"],
-                "nombre": f"E2ESub_{suffix}",
-            },
+        subs = client.get(
+            f"/api/v1/subcategories?category_id={category['id']}&limit=5",
             headers=headers,
         )
-        assert sub.status_code == 201, sub.text
+        assert subs.status_code == 200, subs.text
+        assert subs.json()["total"] >= 1
+        sub = subs.json()["items"][0]
 
         tx = client.post(
             "/api/v1/transactions",
             json={
                 "account_id": account.json()["id"],
-                "category_id": category.json()["id"],
-                "sub_category_id": sub.json()["id"],
+                "category_id": category["id"],
+                "sub_category_id": sub["id"],
                 "monto": "9.99",
+                "tipo": "gasto",
                 "fecha": "2026-07-11",
                 "descripcion": "e2e path",
             },
             headers=headers,
         )
-
-        # Assert
         assert tx.status_code == 201, tx.text
         assert tx.json()["descripcion"] == "e2e path"
+
+        summary = client.get("/api/v1/reports/summary", headers=headers)
+        assert summary.status_code == 200, summary.text
+        assert float(summary.json()["total_gastos"]) >= 9.99

@@ -1,30 +1,33 @@
 """
 app/api/v1/endpoints/sub_category.py — CRUD de subcategorías (JWT)
-==================================================================
 
-Rutas plurales: /subcategories
-Query opcional: ?category_id=1 para filtrar.
+Lectura: cualquier autenticado. Escritura: admin.
 """
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_current_admin, get_current_user, get_db
 from app.models.user import User
+from app.schemas.pagination import Page
 from app.schemas.sub_category import SubCategoryCreate, SubCategoryResponse, SubCategoryUpdate
 from app.services.sub_category import SubCategoryService
 
 router = APIRouter(prefix="/subcategories", tags=["subcategories"])
 
 
-@router.get("", response_model=list[SubCategoryResponse])
+@router.get("", response_model=Page[SubCategoryResponse])
 def list_subcategories(
     category_id: int | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> list:
+) -> Page[SubCategoryResponse]:
     _ = current_user
-    return SubCategoryService.list_all(db, category_id=category_id)
+    return SubCategoryService.list_all(
+        db, category_id=category_id, limit=limit, offset=offset
+    )
 
 
 @router.get("/{subcategory_id}", response_model=SubCategoryResponse)
@@ -41,9 +44,8 @@ def get_subcategory(
 def create_subcategory(
     data: SubCategoryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(get_current_admin),
 ):
-    _ = current_user
     return SubCategoryService.create(db, data)
 
 
@@ -52,9 +54,8 @@ def update_subcategory(
     subcategory_id: int,
     data: SubCategoryUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(get_current_admin),
 ):
-    _ = current_user
     return SubCategoryService.update(db, subcategory_id, data)
 
 
@@ -62,7 +63,6 @@ def update_subcategory(
 def delete_subcategory(
     subcategory_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(get_current_admin),
 ) -> None:
-    _ = current_user
     SubCategoryService.delete(db, subcategory_id)

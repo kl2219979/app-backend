@@ -27,9 +27,10 @@ def test_create_and_list_account(client, auth_headers):
     assert "user_id" in created
 
     assert list_resp.status_code == 200
-    accounts = list_resp.json()
-    assert len(accounts) == 1
-    assert accounts[0]["id"] == created["id"]
+    page = list_resp.json()
+    assert page["total"] == 1
+    assert len(page["items"]) == 1
+    assert page["items"][0]["id"] == created["id"]
 
 
 def test_accounts_require_auth(client):
