@@ -16,7 +16,7 @@ from app.api.v1.endpoints import health
 from app.api.v1.endpoints import category
 from app.api.v1.endpoints import account
 from app.api.v1.endpoints import sub_category
-from app.api.v1.endpoints import transaccion
+from app.api.v1.endpoints import transaction
 from app.api.v1.endpoints import users
 
 
