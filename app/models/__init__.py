@@ -1,25 +1,25 @@
 """
-app/models/ — Tablas representadas en Python
---------------------------------------------
+app/models/ — Modelos SQLAlchemy (entidades ↔ tablas).
 
 QUÉ ES
-    Aquí defines las entidades (User, Product, etc.) como clases SQLAlchemy.
+    Cada archivo define una clase que hereda de Base = una tabla en Postgres.
 
-POR QUÉ EXISTE
-    Es el puente entre "código" y "tablas".
-    Alembic mira estos modelos para crear/alterar la BD desacoplada.
-
-CÓMO AGREGAR UNA TABLA NUEVA
-    1. Crea app/models/user.py con class User(Base): ...
-    2. Impórtalo aquí:
-           from app.models.user import User  # noqa: F401
-    3. alembic revision --autogenerate -m "add users"
+CÓMO AGREGAR UN MODELO NUEVO
+    1. Crea app/models/mi_entidad.py con class MiEntidad(Base): ...
+    2. Impórtalo aquí (si no, Alembic no lo detecta).
+    3. alembic revision --autogenerate -m "descripcion"
     4. ./scripts/migrate.sh
 
+MAPA DE RELACIONES
+    Ver docs/MODELOS.md
+
 IMPORTANTE
-    Definir el modelo NO inserta datos.
-    Insertar/actualizar filas lo hacen services + repositories.
+    Definir el modelo NO inserta filas.
+    INSERT/UPDATE los hacen services + repositories.
 """
 
-# Alembic necesita este import para detectar la tabla `users`.
+from app.models.account import Account  # noqa: F401
+from app.models.category import Category  # noqa: F401
+from app.models.sub_category import SubCategory  # noqa: F401
+from app.models.transaction import Transaction  # noqa: F401
 from app.models.user import User  # noqa: F401
