@@ -1,34 +1,68 @@
-from fastapi import APIRouter
-from app.schemas.sub_category import subCategoryCreate, subCategoryUpdate
+"""
+app/api/v1/endpoints/sub_category.py — CRUD de subcategorías (JWT)
+==================================================================
 
-router = APIRouter()
+Rutas plurales: /subcategories
+Query opcional: ?category_id=1 para filtrar.
+"""
 
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
-@router.get("/subcategory")
-def sub_category_check() -> dict[str, str]:
-    """Responde ok si el servidor HTTP está arriba."""
-    return {"status": "ok", "msg": "hola, hot-reload este el enpoint de las SUB CATEGORIAS"}
+from app.api.deps import get_current_user, get_db
+from app.models.user import User
+from app.schemas.sub_category import SubCategoryCreate, SubCategoryResponse, SubCategoryUpdate
+from app.services.sub_category import SubCategoryService
 
-
-@router.get("/subcategory/{subcategory_id}")
-def get_sub_category(subcategory_id: int) -> dict[str, str]:
-    """Obtiene una subcategoría por su ID."""
-    return {"status": "ok", "msg": f"subcategory {subcategory_id}"}
-
-
-@router.post("/subcategory")
-def create_sub_category(data: subCategoryCreate) -> dict[str, str]:
-    """Crea una nueva subcategoría."""
-    return {"status": "ok", "msg": "subcategoria creada"}
+router = APIRouter(prefix="/subcategories", tags=["subcategories"])
 
 
-@router.put("/subcategory/{subcategory_id}")
-def update_sub_category(subcategory_id: int, data: subCategoryUpdate) -> dict[str, str]:
-    """Actualiza una subcategoría existente."""
-    return {"status": "ok", "msg": f"subcategory {subcategory_id} actualizada"}
+@router.get("", response_model=list[SubCategoryResponse])
+def list_subcategories(
+    category_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list:
+    _ = current_user
+    return SubCategoryService.list_all(db, category_id=category_id)
 
 
-@router.delete("/subcategory/{subcategory_id}")
-def delete_sub_category(subcategory_id: int) -> dict[str, str]:
-    """Elimina una subcategoría."""
-    return {"status": "ok", "msg": f"subcategory {subcategory_id} eliminada"}
+@router.get("/{subcategory_id}", response_model=SubCategoryResponse)
+def get_subcategory(
+    subcategory_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ = current_user
+    return SubCategoryService.get(db, subcategory_id)
+
+
+@router.post("", response_model=SubCategoryResponse, status_code=status.HTTP_201_CREATED)
+def create_subcategory(
+    data: SubCategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ = current_user
+    return SubCategoryService.create(db, data)
+
+
+@router.put("/{subcategory_id}", response_model=SubCategoryResponse)
+def update_subcategory(
+    subcategory_id: int,
+    data: SubCategoryUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ = current_user
+    return SubCategoryService.update(db, subcategory_id, data)
+
+
+@router.delete("/{subcategory_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_subcategory(
+    subcategory_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    _ = current_user
+    SubCategoryService.delete(db, subcategory_id)

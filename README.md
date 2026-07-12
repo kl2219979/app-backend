@@ -9,7 +9,8 @@ Arquitectura: la base de datos vive desacoplada en su propio contenedor; el back
 > Mapa de tablas y FK: [`docs/MODELOS.md`](docs/MODELOS.md).  
 > Auth (hash + JWT): [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md).  
 > Repositories: [`docs/REPOSITORIOS.md`](docs/REPOSITORIOS.md).  
-> Tests (patrón AAA): [`docs/TESTING.md`](docs/TESTING.md).
+> Tests (patrón AAA): [`docs/TESTING.md`](docs/TESTING.md).  
+> Hoja de ruta (pasos 1–5): [`docs/HOJA_RUTA.md`](docs/HOJA_RUTA.md).
 
 ## Equipo
 

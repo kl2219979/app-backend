@@ -1,21 +1,23 @@
+"""Schemas Pydantic del recurso SubCategory."""
+
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class subCategoryCreate(BaseModel):
+class SubCategoryCreate(BaseModel):
     category_id: int = Field(gt=0)
     nombre: str = Field(min_length=1, max_length=100)
-    descripcion: str = Field(max_length=255)
+    descripcion: str = Field(default="", max_length=255)
 
 
-class subCategoryUpdate(BaseModel):
+class SubCategoryUpdate(BaseModel):
     category_id: int | None = Field(default=None, gt=0)
     nombre: str | None = Field(default=None, min_length=1, max_length=100)
     descripcion: str | None = Field(default=None, max_length=255)
 
 
-class subCategoryResponse(BaseModel):
+class SubCategoryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -24,3 +26,8 @@ class subCategoryResponse(BaseModel):
     descripcion: str
     creado_en: datetime
     actualizado_en: datetime
+
+
+subCategoryCreate = SubCategoryCreate
+subCategoryUpdate = SubCategoryUpdate
+subCategoryResponse = SubCategoryResponse

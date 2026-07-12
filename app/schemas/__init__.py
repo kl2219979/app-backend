@@ -1,16 +1,34 @@
 """
-app/schemas/ — Forma del JSON de la API
----------------------------------------
+app/schemas/ — Contratos HTTP (Pydantic)
 
-QUÉ ES
-    Clases Pydantic que validan lo que entra y sale por HTTP.
-
-POR QUÉ SEPARARLO DE models/
-    - models/ habla con la BD (columnas, relaciones).
-    - schemas/ habla con el cliente (qué campos se exponen en el JSON).
-
-    Así no filtras password_hash u otros detalles internos al frontend.
-
-Schemas de auth: `app/schemas/auth.py` (registro, token, usuario público).
-Documentación: `docs/SEGURIDAD.md`.
+Preferir PascalCase: AccountCreate, CategoryResponse, …
+Los alias camelCase (accountCreate, …) se mantienen por compatibilidad.
 """
+
+from app.schemas.account import AccountCreate, AccountResponse, AccountUpdate
+from app.schemas.auth import Token, UserPublic, UserRegister
+from app.schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate
+from app.schemas.sub_category import SubCategoryCreate, SubCategoryResponse, SubCategoryUpdate
+from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate
+from app.schemas.user import UserCreate, UserResponse, UserUpdate
+
+__all__ = [
+    "AccountCreate",
+    "AccountResponse",
+    "AccountUpdate",
+    "CategoryCreate",
+    "CategoryResponse",
+    "CategoryUpdate",
+    "SubCategoryCreate",
+    "SubCategoryResponse",
+    "SubCategoryUpdate",
+    "Token",
+    "TransactionCreate",
+    "TransactionResponse",
+    "TransactionUpdate",
+    "UserCreate",
+    "UserPublic",
+    "UserRegister",
+    "UserResponse",
+    "UserUpdate",
+]

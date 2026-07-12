@@ -1,35 +1,66 @@
-from fastapi import APIRouter
-from app.schemas.category import categoryCreate, categoryUpdate 
+"""
+app/api/v1/endpoints/category.py — CRUD de categorías (JWT)
+===========================================================
+
+Rutas plurales: /categories
+"""
+
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user, get_db
+from app.models.user import User
+from app.schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate
+from app.services.category import CategoryService
+
+router = APIRouter(prefix="/categories", tags=["categories"])
 
 
-router = APIRouter()
+@router.get("", response_model=list[CategoryResponse])
+def list_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list:
+    _ = current_user
+    return CategoryService.list_all(db)
 
 
-@router.get("/category")
-def category_check() -> dict[str, str]:
-    """Responde ok si el servidor HTTP está arriba."""
-    return {"status": "ok", "msg": "hola, hot-reload este el enpoint de las categoriass"}
+@router.get("/{category_id}", response_model=CategoryResponse)
+def get_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ = current_user
+    return CategoryService.get(db, category_id)
 
 
-@router.get("/category/{category_id}")
-def get_category(category_id: int) -> dict[str, str]:
-    """Obtiene una categoría por su ID."""
-    return {"status": "ok", "msg": f"category {category_id}"}
+@router.post("", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
+def create_category(
+    data: CategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ = current_user
+    return CategoryService.create(db, data)
 
 
-@router.post("/category")
-def create_category(data: categoryCreate) -> dict[str, str]:
-    """Crea una nueva categoría."""
-    return {"status": "ok", "msg": "categoria creada"}
+@router.put("/{category_id}", response_model=CategoryResponse)
+def update_category(
+    category_id: int,
+    data: CategoryUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ = current_user
+    return CategoryService.update(db, category_id, data)
 
 
-@router.put("/category/{category_id}")
-def update_category(category_id: int, data: categoryUpdate) -> dict[str, str]:
-    """Actualiza una categoría existente."""
-    return {"status": "ok", "msg": f"category {category_id} actualizada"}
-
-
-@router.delete("/category/{category_id}")
-def delete_category(category_id: int) -> dict[str, str]:
-    """Elimina una categoría."""
-    return {"status": "ok", "msg": f"category {category_id} eliminada"}
+@router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    _ = current_user
+    CategoryService.delete(db, category_id)

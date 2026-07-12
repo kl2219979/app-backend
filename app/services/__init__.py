@@ -1,17 +1,23 @@
 """
-app/services/ — Reglas de negocio
----------------------------------
+app/services/ — Capa de reglas de negocio
+=========================================
 
-QUÉ ES
-    El lugar donde decides QUÉ se puede hacer.
+Endpoint → Service → Repository → Postgres
 
-POR QUÉ EXISTE
-    Ejemplo: "no crear dos usuarios con el mismo email",
-    "solo un admin puede borrar X", "calcular el total del pedido".
-
-    Eso NO va en el endpoint (que solo recibe HTTP)
-    ni en el repository (que solo sabe hacer SQL).
-
-FLUJO
-    Endpoint → Service (decide) → Repository (persiste) → Postgres
+Módulos:
+  account.py, category.py, sub_category.py, transaction.py, user.py
 """
+
+from app.services.account import AccountService
+from app.services.category import CategoryService
+from app.services.sub_category import SubCategoryService
+from app.services.transaction import TransactionService
+from app.services.user import UserService
+
+__all__ = [
+    "AccountService",
+    "CategoryService",
+    "SubCategoryService",
+    "TransactionService",
+    "UserService",
+]
