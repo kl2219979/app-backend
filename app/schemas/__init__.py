@@ -1,8 +1,8 @@
 """
 app/schemas/ — Contratos HTTP (Pydantic)
 
-Preferir PascalCase: AccountCreate, CategoryResponse, …
-Los alias camelCase (accountCreate, …) se mantienen por compatibilidad.
+Convención: PascalCase (AccountCreate, CategoryResponse, …).
+Importar desde el submódulo concreto: from app.schemas.account import AccountCreate
 """
 
 from app.schemas.account import AccountCreate, AccountResponse, AccountUpdate

@@ -82,6 +82,7 @@
 # Archivos
 # --------
 #   app/models/user.py
+#   app/models/refresh_token.py
 #   app/models/account.py
 #   app/models/category.py
 #   app/models/sub_category.py

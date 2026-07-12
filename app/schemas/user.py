@@ -10,7 +10,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserCreate(BaseModel):
-    """Alta de usuario (también usable internamente; preferir /auth/register)."""
+    """
+    Alta interna de usuario (reservado).
+
+    Hoy el registro público usa UserRegister en /auth/register.
+    Mantener para un futuro endpoint admin de creación de usuarios.
+    """
 
     nombres: str = Field(min_length=1, max_length=150)
     apellidos: str = Field(min_length=1, max_length=150)
@@ -43,8 +48,3 @@ class UserResponse(BaseModel):
     usuario: str
     rol: str
     creado_en: datetime
-
-
-userCreate = UserCreate
-userUpdate = UserUpdate
-userResponse = UserResponse

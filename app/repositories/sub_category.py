@@ -23,11 +23,6 @@ class SubCategoryRepository:
         return items
 
     @staticmethod
-    def list_all(db: Session) -> list[SubCategory]:
-        items, _ = SubCategoryRepository.list_filtered(db, limit=10_000, offset=0)
-        return items
-
-    @staticmethod
     def list_filtered(
         db: Session,
         *,

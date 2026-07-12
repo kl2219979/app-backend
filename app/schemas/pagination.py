@@ -10,7 +10,12 @@ T = TypeVar("T")
 
 
 class PageParams(BaseModel):
-    """Query params tipados (también se usan como Depends manuales)."""
+    """
+    Query params tipados para paginación.
+
+    Reservado para unificar limit/offset vía Depends(PageParams) en endpoints.
+    Hoy los endpoints declaran Query(...) directamente.
+    """
 
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)

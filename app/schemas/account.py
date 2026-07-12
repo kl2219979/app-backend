@@ -36,9 +36,3 @@ class AccountResponse(BaseModel):
     saldo: Decimal
     creado_en: datetime
     actualizado_en: datetime
-
-
-# Alias por compatibilidad con imports antiguos (camelCase).
-accountCreate = AccountCreate
-accountUpdate = AccountUpdate
-accountResponse = AccountResponse

@@ -42,8 +42,3 @@ class TransactionResponse(BaseModel):
     descripcion: str
     creado_en: datetime
     actualizado_en: datetime
-
-
-transactionCreate = TransactionCreate
-transactionUpdate = TransactionUpdate
-transactionResponse = TransactionResponse

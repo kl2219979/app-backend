@@ -45,4 +45,6 @@ class LogoutRequest(BaseModel):
 
 
 class TokenPayload(BaseModel):
+    """Payload tipado del JWT (reservado para validación explícita en auth)."""
+
     sub: str

@@ -23,8 +23,3 @@ class CategoryResponse(BaseModel):
     descripcion: str
     creado_en: datetime
     actualizado_en: datetime
-
-
-categoryCreate = CategoryCreate
-categoryUpdate = CategoryUpdate
-categoryResponse = CategoryResponse

@@ -9,34 +9,35 @@
 # Convención de commit
 # --------------------
 # Los repositories hacen add/delete + flush (para obtener ids).
-# Quien orquesta (service o endpoint) llama db.commit().
+# Quien orquesta (service) llama db.commit().
 #
-# Ejemplo
-# -------
-#   from app.repositories.account import AccountRepository
-#   from app.models.account import Account
+# Listados paginados
+# ------------------
+# Preferir list_filtered(...) → (items, total) en accounts, categories,
+# subcategories y transactions. Los métodos list_by_* / list_all son
+# atajos de conveniencia donde aún existen.
 #
-#   acc = Account(user_id=1, banco="X", tipo="ahorro", moneda="USD", saldo=0)
-#   AccountRepository.create(db, acc)
-#   db.commit()
-#
-# Métodos útiles por entidad
-# --------------------------
+# Métodos por entidad
+# -------------------
 # UserRepository
 #   get_by_id, get_by_correo, get_by_usuario, get_by_correo_or_usuario
 #   exists_correo_or_usuario, create, update, delete
 #
+# RefreshTokenRepository
+#   create, get_active_by_hash, revoke, revoke_all_for_user
+#
 # AccountRepository
-#   get_by_id, get_by_id_for_user, list_by_user, create, update, delete
-#
-# CategoryRepository
-#   get_by_id, get_by_nombre, list_all, create, update, delete
-#
-# SubCategoryRepository
-#   get_by_id, list_by_category, list_all, create, update, delete
-#
-# TransactionRepository
-#   get_by_id, get_by_id_for_user, list_by_account, list_by_user
+#   get_by_id, get_by_id_for_user, list_by_user, list_filtered
 #   create, update, delete
 #
-# Siguiente paso natural: services/ que usen estos repositories + reglas.
+# CategoryRepository
+#   get_by_id, get_by_nombre, list_all, list_filtered
+#   create, update, delete
+#
+# SubCategoryRepository
+#   get_by_id, list_by_category, list_filtered
+#   create, update, delete
+#
+# TransactionRepository
+#   get_by_id, get_by_id_for_user, list_by_account, list_by_user, list_filtered
+#   create, update, delete

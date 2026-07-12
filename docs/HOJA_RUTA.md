@@ -57,7 +57,7 @@
 # ---------------------------------------------------------------------------
 # Paso 5 — Limpieza y unificación
 # ---------------------------------------------------------------------------
-# - Schemas en PascalCase (AccountCreate, …) con alias camelCase legacy
+# - Schemas en PascalCase (AccountCreate, …)
 # - Rutas plurales:
 #     /accounts  /categories  /subcategories  /transactions  /users
 # - Stubs de hot-reload eliminados
@@ -161,4 +161,22 @@
 #
 # Fuera de alcance (consciente):
 #   notificaciones, uploads, multi-tenant complejo
+#
+# ---------------------------------------------------------------------------
+# Paso 9 — Limpieza conservadora (solo código sin uso ni futuro claro)
+# ---------------------------------------------------------------------------
+# Criterio: antes de borrar, preguntar si tiene uso futuro.
+#
+# Eliminado:
+#   - Alias camelCase en schemas (accountCreate, …) — cero imports
+#   - SubCategoryRepository.list_all — duplicaba list_filtered
+#
+# Mantenido a propósito (uso futuro):
+#   - UserCreate        → alta admin de usuarios
+#   - PageParams        → Depends unificado en listados
+#   - TokenPayload      → validación tipada de JWT
+#   - pytest-asyncio    → tests async si se necesitan
+#   - UserPublic vs UserResponse — auth vs perfil /users
+#
+# Docs actualizadas: REPOSITORIOS, MODELOS, este archivo.
 #

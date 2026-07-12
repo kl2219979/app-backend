@@ -26,8 +26,3 @@ class SubCategoryResponse(BaseModel):
     descripcion: str
     creado_en: datetime
     actualizado_en: datetime
-
-
-subCategoryCreate = SubCategoryCreate
-subCategoryUpdate = SubCategoryUpdate
-subCategoryResponse = SubCategoryResponse
