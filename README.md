@@ -7,7 +7,8 @@ Arquitectura: la base de datos vive desacoplada en su propio contenedor; el back
 > **Empieza aquí si quieres entender el proyecto:**  
 > lee [`docs/COMO_FUNCIONA.md`](docs/COMO_FUNCIONA.md) — explica **qué hace cada pieza y por qué existe**, paso a paso.  
 > Mapa de tablas y FK: [`docs/MODELOS.md`](docs/MODELOS.md).  
-> Auth (hash + JWT): [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md).
+> Auth (hash + JWT): [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md).  
+> Repositories: [`docs/REPOSITORIOS.md`](docs/REPOSITORIOS.md).
 
 ## Equipo
 
