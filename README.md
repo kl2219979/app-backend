@@ -6,16 +6,20 @@ Arquitectura: la base de datos vive desacoplada en su propio contenedor; el back
 
 > **Empieza aquí si quieres entender el proyecto:**  
 > lee [`docs/COMO_FUNCIONA.md`](docs/COMO_FUNCIONA.md) — explica **qué hace cada pieza y por qué existe**, paso a paso.  
-> Mapa de tablas y FK: [`docs/MODELOS.md`](docs/MODELOS.md).
+> Mapa de tablas y FK: [`docs/MODELOS.md`](docs/MODELOS.md).  
+> Auth (hash + JWT): [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md).
+
 ## Equipo
 
-| Rol | Responsable |
-|-----|-------------|
-| Scrum Master | — |
-| Product Owner | — |
-| Frontend (×2) | Rama propia (repo frontend) |
-| Backend (×2) | Andrés → `dev_andres`, Kevin → `dev_kevin` |
-| QA | Kevin |
+
+| Rol           | Responsable                                |
+| ------------- | ------------------------------------------ |
+| Scrum Master  | —                                          |
+| Product Owner | —                                          |
+| Frontend (×2) | Rama propia (repo frontend)                |
+| Backend (×2)  | Andrés → `dev_andres`, Kevin → `dev_kevin` |
+| QA            | Kevin                                      |
+
 
 ## Arquitectura de datos
 
@@ -29,13 +33,15 @@ Arquitectura: la base de datos vive desacoplada en su propio contenedor; el back
                                                     └──────────────────────────┘
 ```
 
-| Pieza | Responsabilidad |
-|--------|-----------------|
-| Contenedor `db` | PostgreSQL listo en un puerto. Sin scripts de negocio ni DDL de dominio. |
-| Alembic | Crea y modifica el **esquema** (`alembic upgrade head`). |
-| SQLAlchemy models | Mapean tablas ↔ Python. |
-| Repositories | Cómo se lee/escribe. |
-| Services | Qué se permite insertar/modificar (lógica de negocio). |
+
+| Pieza             | Responsabilidad                                                          |
+| ----------------- | ------------------------------------------------------------------------ |
+| Contenedor `db`   | PostgreSQL listo en un puerto. Sin scripts de negocio ni DDL de dominio. |
+| Alembic           | Crea y modifica el **esquema** (`alembic upgrade head`).                 |
+| SQLAlchemy models | Mapean tablas ↔ Python.                                                  |
+| Repositories      | Cómo se lee/escribe.                                                     |
+| Services          | Qué se permite insertar/modificar (lógica de negocio).                   |
+
 
 El frontend **nunca** habla con Postgres; solo con la API.
 
@@ -120,12 +126,14 @@ docker compose up db -d
 # 2) Aplicar esquema (Alembic)
 ./scripts/migrate.sh
 
+
+
 # 3) API
 uvicorn app.main:app --reload
 ```
 
-API: http://localhost:8000  
-Docs: http://localhost:8000/docs
+API: [http://localhost:8000](http://localhost:8000)  
+Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### Opción B: Stack completo con Docker
 
@@ -171,11 +179,13 @@ ruff check app tests
 
 Copia `.env.example` a `.env` y ajusta los valores. **No subas `.env` al repositorio.**
 
-| Variable | Descripción |
-|----------|-------------|
-| `DATABASE_URL` | URL de conexión PostgreSQL (API → BD desacoplada) |
-| `SECRET_KEY` | Clave para tokens JWT |
+
+| Variable       | Descripción                                                      |
+| -------------- | ---------------------------------------------------------------- |
+| `DATABASE_URL` | URL de conexión PostgreSQL (API → BD desacoplada)                |
+| `SECRET_KEY`   | Clave para tokens JWT                                            |
 | `CORS_ORIGINS` | Orígenes permitidos del frontend (Vite: `http://localhost:5173`) |
+
 
 ## QA
 
@@ -192,3 +202,4 @@ git remote add origin https://github.com/<tu-usuario>/app-backend.git
 git push -u origin main
 git push -u origin dev dev_andres dev_kevin
 ```
+
