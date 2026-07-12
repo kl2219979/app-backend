@@ -21,6 +21,8 @@
 set -euo pipefail
 
 cd /app
+# Sin esto, `python scripts/wait_for_db.py` no encuentra el paquete `app`.
+export PYTHONPATH="/app${PYTHONPATH:+:$PYTHONPATH}"
 
 echo "[entrypoint] 1/3 Esperando a que PostgreSQL acepte conexiones..."
 python scripts/wait_for_db.py

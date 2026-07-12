@@ -22,6 +22,8 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+# Raíz del repo en el path de Python (para `import app` desde scripts/).
+export PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}"
 
 if [ -f ".venv/bin/activate" ]; then
   # shellcheck disable=SC1091

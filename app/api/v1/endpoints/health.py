@@ -19,4 +19,4 @@ router = APIRouter()
 @router.get("/health")
 def health_check() -> dict[str, str]:
     """Responde ok si el servidor HTTP está arriba."""
-    return {"status": "ok"}
+    return {"status": "ok", "msg": "hola, hot-reload funcion"}

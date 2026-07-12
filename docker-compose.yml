@@ -27,8 +27,12 @@ services:
   # QUÉ NO HACE: no crea tablas de usuarios/productos. Eso lo hace Alembic.
   db:
     image: postgres:16-alpine
+    # alpine es una versión minimal de Linux que es más ligera y rápida que la versión completa de Linux.
     container_name: app_backend_db
     restart: unless-stopped
+    # unless-stopped: si el contenedor se detiene, se reinicia.
+
+
     environment:
       # Usuario, clave y nombre de la base (vienen del .env).
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -66,6 +70,8 @@ services:
       # NO "localhost" (localhost sería el propio contenedor api).
       POSTGRES_HOST: db
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-app_db}
+      # Necesario porque el volumen monta el código y scripts importan el paquete `app`.
+      PYTHONPATH: /app
     ports:
       - "${PORT:-8000}:8000"
     depends_on:
