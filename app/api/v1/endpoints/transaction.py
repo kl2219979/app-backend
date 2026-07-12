@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from app.schemas.transaction import transactionCreate, transactionUpdate
 
 router = APIRouter()
 
@@ -16,13 +17,13 @@ def get_transaction(transaction_id: int) -> dict[str, str]:
 
 
 @router.post("/transactions")
-def create_transaction() -> dict[str, str]:
+def create_transaction(data: transactionCreate) -> dict[str, str]:
     """Crea una nueva transacción"""
     return {"status": "ok", "msg": "transaction creada"}
 
 
 @router.put("/transactions/{transaction_id}")
-def update_transaction(transaction_id: int) -> dict[str, str]:
+def update_transaction(transaction_id: int, data: transactionUpdate) -> dict[str, str]:
     """Actualiza una transacción existente"""
     return {"status": "ok", "msg": f"transaction {transaction_id} actualizada"}
 

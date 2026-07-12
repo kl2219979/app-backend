@@ -1,4 +1,6 @@
 from fastapi import APIRouter
+from app.schemas.category import categoryCreate, categoryUpdate 
+
 
 router = APIRouter()
 
@@ -16,13 +18,13 @@ def get_category(category_id: int) -> dict[str, str]:
 
 
 @router.post("/category")
-def create_category() -> dict[str, str]:
+def create_category(data: categoryCreate) -> dict[str, str]:
     """Crea una nueva categoría."""
     return {"status": "ok", "msg": "categoria creada"}
 
 
 @router.put("/category/{category_id}")
-def update_category(category_id: int) -> dict[str, str]:
+def update_category(category_id: int, data: categoryUpdate) -> dict[str, str]:
     """Actualiza una categoría existente."""
     return {"status": "ok", "msg": f"category {category_id} actualizada"}
 
