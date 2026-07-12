@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from app.schemas.sub_category import subCategoryCreate, subCategoryUpdate
 
 router = APIRouter()
 
@@ -16,13 +17,13 @@ def get_sub_category(subcategory_id: int) -> dict[str, str]:
 
 
 @router.post("/subcategory")
-def create_sub_category() -> dict[str, str]:
+def create_sub_category(data: subCategoryCreate) -> dict[str, str]:
     """Crea una nueva subcategoría."""
     return {"status": "ok", "msg": "subcategoria creada"}
 
 
 @router.put("/subcategory/{subcategory_id}")
-def update_sub_category(subcategory_id: int) -> dict[str, str]:
+def update_sub_category(subcategory_id: int, data: subCategoryUpdate) -> dict[str, str]:
     """Actualiza una subcategoría existente."""
     return {"status": "ok", "msg": f"subcategory {subcategory_id} actualizada"}
 

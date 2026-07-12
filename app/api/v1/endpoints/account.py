@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from app.schemas.account import accountCreate, accountUpdate
 
 router = APIRouter()
 
@@ -16,13 +17,13 @@ def get_account(account_id: int) -> dict[str, str]:
 
 
 @router.post("/accounts")
-def create_account() -> dict[str, str]:
+def create_account(data: accountCreate) -> dict[str, str]:
     """Crea una nueva cuenta."""
     return {"status": "ok", "msg": "account creada"}
 
 
 @router.put("/accounts/{account_id}")
-def update_account(account_id: int) -> dict[str, str]:
+def update_account(account_id: int, data: accountUpdate) -> dict[str, str]:
     """Actualiza una cuenta existente."""
     return {"status": "ok", "msg": f"account {account_id} actualizada"}
 
