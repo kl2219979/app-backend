@@ -16,8 +16,10 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Sin .pyc; logs al instante en la consola de Docker.
+# PYTHONPATH=/app: permite `import app` al correr scripts/ (p. ej. wait_for_db.py).
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
 # Herramientas para que psycopg2 (driver de Postgres) pueda instalarse.
 RUN apt-get update && apt-get install -y --no-install-recommends \

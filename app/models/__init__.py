@@ -20,3 +20,6 @@ IMPORTANTE
     Definir el modelo NO inserta datos.
     Insertar/actualizar filas lo hacen services + repositories.
 """
+
+# Alembic necesita este import para detectar la tabla `users`.
+from app.models.user import User  # noqa: F401
