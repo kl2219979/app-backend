@@ -54,6 +54,8 @@ class Transaction(Base):
     )
 
     monto: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    # "gasto" resta del saldo; "ingreso" suma. Default gasto (tracker de gastos).
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False, default="gasto")
     fecha: Mapped[date] = mapped_column(Date, nullable=False)
     descripcion: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 

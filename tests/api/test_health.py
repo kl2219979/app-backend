@@ -1,6 +1,10 @@
 """
-Tests del healthcheck — patrón AAA (Arrange / Act / Assert).
+Integration (API) — healthcheck.
 """
+
+import pytest
+
+pytestmark = pytest.mark.integration
 
 
 def test_health_check_returns_ok(client):

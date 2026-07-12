@@ -1,6 +1,10 @@
 """
-Tests AAA del CRUD de accounts (requiere JWT).
+Integration (API) — smoke CRUD de accounts (JWT + SQLite).
 """
+
+import pytest
+
+pytestmark = pytest.mark.integration
 
 
 def test_create_and_list_account(client, auth_headers):

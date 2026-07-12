@@ -28,7 +28,10 @@ class AccountService:
             db, account_id=account_id, user_id=current_user.id
         )
         if account is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cuenta no encontrada")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cuenta no encontrada",
+            )
         return account
 
     @staticmethod

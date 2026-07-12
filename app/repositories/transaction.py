@@ -8,7 +8,9 @@ porque Transaction no tiene user_id directo.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from datetime import date
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.account import Account
@@ -52,14 +54,54 @@ class TransactionRepository:
     @staticmethod
     def list_by_user(db: Session, user_id: int) -> list[Transaction]:
         """Todas las transacciones de todas las cuentas del usuario."""
-        return list(
+        items, _ = TransactionRepository.list_filtered(
+            db,
+            user_id=user_id,
+            limit=10_000,
+            offset=0,
+        )
+        return items
+
+    @staticmethod
+    def list_filtered(
+        db: Session,
+        *,
+        user_id: int,
+        account_id: int | None = None,
+        category_id: int | None = None,
+        tipo: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[Transaction], int]:
+        """Lista paginada con filtros opcionales. Retorna (items, total)."""
+        filters = [Account.user_id == user_id]
+        if account_id is not None:
+            filters.append(Transaction.account_id == account_id)
+        if category_id is not None:
+            filters.append(Transaction.category_id == category_id)
+        if tipo is not None:
+            filters.append(Transaction.tipo == tipo)
+        if date_from is not None:
+            filters.append(Transaction.fecha >= date_from)
+        if date_to is not None:
+            filters.append(Transaction.fecha <= date_to)
+
+        base = (
+            select(Transaction)
+            .join(Account, Transaction.account_id == Account.id)
+            .where(*filters)
+        )
+        total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+        items = list(
             db.scalars(
-                select(Transaction)
-                .join(Account, Transaction.account_id == Account.id)
-                .where(Account.user_id == user_id)
-                .order_by(Transaction.fecha.desc(), Transaction.id.desc())
+                base.order_by(Transaction.fecha.desc(), Transaction.id.desc())
+                .limit(limit)
+                .offset(offset)
             ).all()
         )
+        return items, int(total)
 
     @staticmethod
     def create(db: Session, transaction: Transaction) -> Transaction:

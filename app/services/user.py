@@ -25,7 +25,10 @@ class UserService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
         user = UserRepository.get_by_id(db, user_id)
         if user is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Usuario no encontrado",
+            )
         return user
 
     @staticmethod

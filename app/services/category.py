@@ -21,7 +21,10 @@ class CategoryService:
     def get(db: Session, category_id: int) -> Category:
         category = CategoryRepository.get_by_id(db, category_id)
         if category is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoría no encontrada")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Categoría no encontrada",
+            )
         return category
 
     @staticmethod

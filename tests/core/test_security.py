@@ -1,7 +1,5 @@
 """
-Tests unitarios de app.core.security — patrón AAA.
-
-No necesitan base de datos ni TestClient: prueban hash y JWT en aislamiento.
+Unit tests — app.core.security (hash + JWT, sin BD ni HTTP).
 """
 
 from datetime import timedelta
@@ -19,6 +17,8 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+
+pytestmark = pytest.mark.unit
 
 
 def test_hash_password_returns_bcrypt_hash_not_plaintext():

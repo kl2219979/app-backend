@@ -4,25 +4,51 @@ app/api/v1/endpoints/transaction.py — CRUD de transacciones (JWT)
 
 Rutas plurales: /transactions
 Solo ves/editas movimientos de tus cuentas.
+
+Listado paginado:
+  GET /transactions?limit=20&offset=0
+       &account_id=&category_id=&tipo=gasto|ingreso
+       &date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
 """
 
-from fastapi import APIRouter, Depends, status
+from datetime import date
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
+from app.schemas.pagination import Page
 from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate
 from app.services.transaction import TransactionService
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 
-@router.get("", response_model=list[TransactionResponse])
+@router.get("", response_model=Page[TransactionResponse])
 def list_transactions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> list:
-    return TransactionService.list_mine(db, current_user)
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    account_id: int | None = Query(default=None, gt=0),
+    category_id: int | None = Query(default=None, gt=0),
+    tipo: Literal["gasto", "ingreso"] | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+) -> Page[TransactionResponse]:
+    return TransactionService.list_mine(
+        db,
+        current_user,
+        account_id=account_id,
+        category_id=category_id,
+        tipo=tipo,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/{transaction_id}", response_model=TransactionResponse)

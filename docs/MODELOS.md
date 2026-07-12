@@ -54,12 +54,23 @@
 #   account_id      (FK → accounts.id)
 #   category_id     (FK → categories.id)
 #   sub_category_id (FK → sub_categories.id)
-#   monto, fecha, descripcion
+#   monto, tipo ("gasto" | "ingreso"), fecha, descripcion
 #   creado_en, actualizado_en
+#
+# Nota saldo:
+#   El service ajusta Account.saldo al crear/actualizar/borrar:
+#   gasto resta, ingreso suma. Al actualizar, primero revierte el efecto
+#   anterior y luego aplica el nuevo (también si cambia de cuenta).
 #
 # Nota: category_id + sub_category_id
 #   La subcategoría ya implica una categoría. Se guardan ambos para consultar
 #   fácil; en el service valida que sub_category.category_id == category_id.
+#
+# Seeds
+# -----
+#   python scripts/seed.py
+#   Carga categorías/subcategorías base (Alimentación, Transporte, …).
+#   Es idempotente: puedes correrlo varias veces.
 #
 # Archivos
 # --------

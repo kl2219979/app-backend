@@ -5,7 +5,7 @@ app/services/ — Capa de reglas de negocio
 Endpoint → Service → Repository → Postgres
 
 Módulos:
-  account.py, category.py, sub_category.py, transaction.py, user.py
+  account.py, category.py, sub_category.py, transaction.py, user.py, seed.py
 """
 
 from app.services.account import AccountService

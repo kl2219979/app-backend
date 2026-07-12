@@ -1,6 +1,10 @@
 """
-Tests AAA de autenticación (API + BD de prueba SQLite).
+Integration (API) — autenticación (TestClient + SQLite).
 """
+
+import pytest
+
+pytestmark = pytest.mark.integration
 
 
 def test_register_creates_user(client):

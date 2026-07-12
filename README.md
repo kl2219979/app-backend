@@ -10,7 +10,7 @@ Arquitectura: la base de datos vive desacoplada en su propio contenedor; el back
 > Auth (hash + JWT): [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md).  
 > Repositories: [`docs/REPOSITORIOS.md`](docs/REPOSITORIOS.md).  
 > Tests (patrón AAA): [`docs/TESTING.md`](docs/TESTING.md).  
-> Hoja de ruta (pasos 1–5): [`docs/HOJA_RUTA.md`](docs/HOJA_RUTA.md).
+> Hoja de ruta (pasos 1–7): [`docs/HOJA_RUTA.md`](docs/HOJA_RUTA.md).
 
 ## Equipo
 
@@ -171,12 +171,38 @@ docker compose up db -d
 # Migraciones
 ./scripts/migrate.sh
 
+# Seeds (categorías iniciales, idempotente)
+python scripts/seed.py
+
 # Tests
-pytest
+pytest -q                 # suite diaria (unit + API smoke)
+pytest -m unit -q         # solo unitarios
+pytest -m integration -q  # smokes API
+# Postgres opt-in: RUN_INTEGRATION=1 TEST_DATABASE_URL=... pytest tests/integration
+# E2E opt-in:     RUN_E2E=1 E2E_BASE_URL=http://localhost:8000 pytest -m e2e
 
 # Linter
 ruff check app tests
 ```
+
+CI en GitHub Actions (`.github/workflows/ci.yml`): Ruff + Pytest en cada push/PR a `main`/`dev`.
+
+Guía completa (pirámide, AAA, markers, política PR): [`docs/TESTING.md`](docs/TESTING.md).
+
+### Listado de transacciones (paginado)
+
+```http
+GET /api/v1/transactions?limit=20&offset=0&account_id=1&tipo=gasto&date_from=2026-01-01
+Authorization: Bearer <token>
+```
+
+Respuesta:
+
+```json
+{ "items": [ ... ], "total": 42, "limit": 20, "offset": 0 }
+```
+
+`tipo`: `gasto` (resta saldo) o `ingreso` (suma saldo).
 
 ## Variables de entorno
 
@@ -192,7 +218,20 @@ Copia `.env.example` a `.env` y ajusta los valores. **No subas `.env` al reposit
 
 ## QA
 
-Kevin es responsable de QA. Las pruebas viven en `tests/`. Ejecutar `pytest` antes de cada PR hacia `dev`.
+Kevin es responsable de QA. Las pruebas viven en `tests/` y siguen la pirámide:
+**muchos unitarios**, **algunos de integración**, **pocos E2E** (ver [`docs/TESTING.md`](docs/TESTING.md)).
+
+Antes de cada PR hacia `dev`:
+
+```bash
+pytest -q
+```
+
+Checklist mínimo:
+
+- Nuevas reglas de negocio → `tests/services/`
+- SQL no trivial → `tests/repositories/`
+- Contrato HTTP nuevo → un smoke en `tests/api/` (no duplicar toda la lógica)
 
 ## Crear el repositorio en GitHub
 

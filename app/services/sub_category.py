@@ -56,11 +56,12 @@ class SubCategoryService:
     def update(db: Session, sub_category_id: int, data: SubCategoryUpdate) -> SubCategory:
         item = SubCategoryService.get(db, sub_category_id)
         payload = data.model_dump(exclude_unset=True)
-        if "category_id" in payload and CategoryRepository.get_by_id(db, payload["category_id"]) is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Categoría no encontrada",
-            )
+        if "category_id" in payload:
+            if CategoryRepository.get_by_id(db, payload["category_id"]) is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Categoría no encontrada",
+                )
         for key, value in payload.items():
             setattr(item, key, value)
         SubCategoryRepository.update(db, item)

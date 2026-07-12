@@ -76,3 +76,61 @@
 #   GET/PUT/DELETE /api/v1/users/{id}  (solo el propio id)
 #
 # Ver también: docs/SEGURIDAD.md, docs/REPOSITORIOS.md, docs/TESTING.md
+#
+# ---------------------------------------------------------------------------
+# Paso 6 — Pirámide de tests (muchos unitarios, algunos integration, pocos E2E)
+# ---------------------------------------------------------------------------
+# Objetivo: madurar cobertura sin inflar E2E.
+#
+# Unit (mayoría):
+#   tests/core/           security (hash + JWT)
+#   tests/services/       test_*_service.py (account, category, sub_category,
+#                         transaction, user)
+#   tests/repositories/   test_*_repository.py (filtros, joins, lookups)
+#   tests/helpers.py      factories make_* para Arrange sin HTTP
+#
+# Integration (algunos):
+#   tests/api/            smoke HTTP con TestClient + SQLite
+#                         (auth, accounts, categories, transactions, health)
+#   tests/integration/    Postgres real — solo con RUN_INTEGRATION=1
+#
+# E2E (pocos, opt-in):
+#   tests/e2e/test_critical_path.py
+#     health → register → login → account → category/sub → transaction
+#     Activar: RUN_E2E=1 E2E_BASE_URL=http://localhost:8000 pytest -m e2e
+#
+# Markers: unit | integration | e2e  (ver pyproject.toml y docs/TESTING.md)
+#
+# Comandos:
+#   pytest -q                 # diario (Postgres/E2E se auto-omiten)
+#   pytest -m unit -q         # solo unitarios
+#   pytest -m integration -q  # API smoke (+ Postgres si RUN_INTEGRATION=1)
+#
+# Documentación detallada y política PR: docs/TESTING.md
+#
+# ---------------------------------------------------------------------------
+# Paso 7 — CI, paginación, seeds y saldo de cuentas
+# ---------------------------------------------------------------------------
+# CI (GitHub Actions):
+#   .github/workflows/ci.yml
+#   - ruff check app tests
+#   - pytest -q -m "not e2e"  (suite diaria; Postgres/E2E opt-in fuera de CI)
+#
+# Paginación + filtros (transactions):
+#   GET /api/v1/transactions?limit=&offset=&account_id=&category_id=
+#       &tipo=gasto|ingreso&date_from=&date_to=
+#   Respuesta: { items, total, limit, offset }  (schemas/pagination.py)
+#
+# Tipo de movimiento + saldo:
+#   transactions.tipo = "gasto" | "ingreso"  (migración a1b2c3d4e5f6)
+#   gasto resta del Account.saldo; ingreso suma; delete/update revierten
+#
+# Seeds:
+#   python scripts/seed.py
+#   Catálogo en app/services/seed.py (idempotente)
+#
+# Aplicar en local tras pull:
+#   ./scripts/migrate.sh
+#   python scripts/seed.py
+#   docker compose up --build -d   # si usas API en Docker
+#

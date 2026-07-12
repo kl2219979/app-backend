@@ -8,6 +8,7 @@ Los alias camelCase (accountCreate, …) se mantienen por compatibilidad.
 from app.schemas.account import AccountCreate, AccountResponse, AccountUpdate
 from app.schemas.auth import Token, UserPublic, UserRegister
 from app.schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate
+from app.schemas.pagination import Page, PageParams
 from app.schemas.sub_category import SubCategoryCreate, SubCategoryResponse, SubCategoryUpdate
 from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
@@ -19,6 +20,8 @@ __all__ = [
     "CategoryCreate",
     "CategoryResponse",
     "CategoryUpdate",
+    "Page",
+    "PageParams",
     "SubCategoryCreate",
     "SubCategoryResponse",
     "SubCategoryUpdate",
