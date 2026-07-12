@@ -12,17 +12,17 @@ Endpoints públicos de autenticación:
 PRINCIPIO
 ---------
 El endpoint orquesta HTTP; el hashing/JWT está en app.core.security;
-la sesión de BD viene de Depends(get_db).
+la persistencia de User pasa por UserRepository.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
+from app.repositories.user import UserRepository
 from app.schemas.auth import Token, UserPublic, UserRegister
 
 router = APIRouter(prefix="/auth")
@@ -38,16 +38,13 @@ def register(body: UserRegister, db: Session = Depends(get_db)) -> User:
     """
     Crea un usuario nuevo.
 
-    - Comprueba que correo/usuario no existan.
+    - Comprueba que correo/usuario no existan (repository).
     - Hashea la contraseña con bcrypt antes de guardar.
     - Nunca persiste `contrasena` en texto plano.
     """
-    existing = db.scalar(
-        select(User).where(
-            or_(User.correo == body.correo, User.usuario == body.usuario)
-        )
-    )
-    if existing is not None:
+    if UserRepository.exists_correo_or_usuario(
+        db, correo=body.correo, usuario=body.usuario
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Ya existe un usuario con ese correo o nombre de usuario",
@@ -62,7 +59,7 @@ def register(body: UserRegister, db: Session = Depends(get_db)) -> User:
         usuario=body.usuario,
         contrasena_hash=hash_password(body.contrasena),
     )
-    db.add(user)
+    UserRepository.create(db, user)
     db.commit()
     db.refresh(user)
     return user
@@ -85,18 +82,9 @@ def login(
       - password: contraseña en texto plano (solo viaja en esta request)
 
     Respuesta: { "access_token": "...", "token_type": "bearer" }
-    Swagger usa este endpoint en el botón Authorize.
     """
-    user = db.scalar(
-        select(User).where(
-            or_(
-                User.usuario == form_data.username,
-                User.correo == form_data.username,
-            )
-        )
-    )
+    user = UserRepository.get_by_correo_or_usuario(db, form_data.username)
     if user is None or not verify_password(form_data.password, user.contrasena_hash):
-        # Mensaje genérico: no revelar si falló el usuario o la clave.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos",
