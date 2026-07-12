@@ -5,7 +5,8 @@ API REST del proyecto, construida con **FastAPI**, **SQLAlchemy**, **Alembic** y
 Arquitectura: la base de datos vive desacoplada en su propio contenedor; el backend es dueño del esquema (Alembic) y de la lógica de datos (services / repositories).
 
 > **Empieza aquí si quieres entender el proyecto:**  
-> lee [`docs/COMO_FUNCIONA.md`](docs/COMO_FUNCIONA.md) — explica **qué hace cada pieza y por qué existe**, paso a paso.
+> lee [`docs/COMO_FUNCIONA.md`](docs/COMO_FUNCIONA.md) — explica **qué hace cada pieza y por qué existe**, paso a paso.  
+> Mapa de tablas y FK: [`docs/MODELOS.md`](docs/MODELOS.md).
 ## Equipo
 
 | Rol | Responsable |

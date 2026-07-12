@@ -1,58 +1,54 @@
 """
-Modelo User → tabla `users` en PostgreSQL.
+Modelo User → tabla `users`.
 
-CÓMO SE LEE ESTE ARCHIVO
-------------------------
-1. Importas tipos de columna (String, Date, ...).
-2. Heredas de Base (así Alembic "ve" la tabla).
-3. Defines __tablename__ (nombre real en la BD).
-4. Cada atributo Mapped[...] = mapped_column(...) es una COLUMNA.
+Relaciones:
+  User 1 ── N Account   (un usuario tiene muchas cuentas bancarias)
 
-Luego:
-  - Importar User en app/models/__init__.py
-  - alembic revision --autogenerate -m "add users"
-  - ./scripts/migrate.sh
+Ver mapa completo: docs/MODELOS.md
 """
 
+from __future__ import annotations
+
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, DateTime, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
+if TYPE_CHECKING:
+    from app.models.account import Account
+
 
 class User(Base):
-    """Un registro de la tabla users (una fila = una persona/cuenta)."""
+    """Persona/cuenta de acceso a la aplicación."""
 
-    # Nombre de la tabla en Postgres (plural por convención).
     __tablename__ = "users"
 
-    # --- Clave primaria ---
-    # autoincrement: Postgres asigna 1, 2, 3... solo.
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    # --- Datos personales ---
-    # String(N) = VARCHAR(N). nullable=False = obligatorio.
     nombres: Mapped[str] = mapped_column(String(150), nullable=False)
     apellidos: Mapped[str] = mapped_column(String(150), nullable=False)
     fecha_nacimiento: Mapped[date] = mapped_column(Date, nullable=False)
     genero: Mapped[str] = mapped_column(String(30), nullable=False)
 
-    # --- Cuenta / acceso ---
-    # unique=True: no puede haber dos iguales en la tabla.
-    # index=True: búsquedas más rápidas por ese campo (login, etc.).
     correo: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     usuario: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
-
-    # NUNCA guardes la contraseña en texto plano.
-    # Aquí guardas el HASH (lo calcularás luego en security.py / services).
+    # Nunca guardar contraseña en texto plano: solo el hash.
     contrasena_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # --- Metadatos útiles ---
-    # server_default=func.now(): la BD pone la fecha al insertar.
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
     )
+
+    # Lado "uno" de User → Accounts. back_populates debe coincidir con Account.user
+    accounts: Mapped[list[Account]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    def __repr__(self) -> str:
+        return f"User(id={self.id}, usuario={self.usuario!r})"
