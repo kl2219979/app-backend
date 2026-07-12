@@ -1,9 +1,15 @@
 """
-tests/conftest.py — Fixtures compartidas de pytest.
+tests/conftest.py — Fixtures compartidas de pytest
+==================================================
 
-`client` expone un TestClient sobre la app FastAPI para probar endpoints
-sin levantar un servidor real. Añade aquí fixtures de BD de prueba cuando
-existan modelos y migraciones de test.
+QUÉ ES
+------
+Fixtures reutilizables por todos los tests (cliente HTTP, etc.).
+
+AAA
+---
+Las fixtures suelen vivir en la fase Arrange: preparan el escenario
+antes del Act del test.
 """
 
 import pytest
@@ -14,5 +20,14 @@ from app.main import app
 
 @pytest.fixture
 def client() -> TestClient:
-    """Cliente HTTP síncrono apuntando a la app en memoria."""
+    """
+    Arrange: cliente HTTP contra la app en memoria (sin uvicorn real).
+
+    Uso en un test:
+        def test_algo(client):
+            # Act
+            response = client.get("/api/v1/health")
+            # Assert
+            assert response.status_code == 200
+    """
     return TestClient(app)
