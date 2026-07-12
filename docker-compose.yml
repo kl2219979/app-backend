@@ -66,10 +66,11 @@ services:
     env_file:
       - .env
     environment:
-      # Dentro de la red Docker, el hostname de Postgres es "db" (nombre del servicio),
-      # NO "localhost" (localhost sería el propio contenedor api).
+      # Dentro de la red Docker: host = nombre del servicio, puerto interno 5432.
+      # DATABASE_URL se arma sola en config.py desde estas piezas (no uses el
+      # POSTGRES_PORT del .env del host, que puede ser 5433).
       POSTGRES_HOST: db
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-app_db}
+      POSTGRES_PORT: "5432"
       # Necesario porque el volumen monta el código y scripts importan el paquete `app`.
       PYTHONPATH: /app
     ports:

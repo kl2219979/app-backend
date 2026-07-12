@@ -2,100 +2,52 @@
 app/core/config.py — Configuración central de la aplicación
 ============================================================
 
-QUÉ ES ESTE ARCHIVO
--------------------
-Lee valores desde:
-  1) variables de entorno del sistema, y/o
-  2) el archivo `.env` en la raíz del proyecto,
-
-y los expone como un objeto tipado llamado `settings`.
-
-El resto del código NO debería hardcodear URLs, secretos ni puertos:
-debe usar `from app.core.config import settings`.
-
-
-PARA QUÉ SIRVE (en la práctica)
--------------------------------
-- Cambiar la BD, el puerto o el CORS sin tocar la lógica de negocio.
-- Que cada compañero tenga su propio `.env` (ej. puerto 5432 vs 5433).
-- Que Docker Compose pueda sobrescribir HOST/URL al correr el servicio `api`.
-
+QUÉ ES
+------
+Lee variables de entorno y/o `.env`, y las expone como `settings` tipado.
+El resto del código usa `from app.core.config import settings` (sin hardcodear).
 
 CÓMO SE USA
 -----------
-    from app.core.config import settings
-
-    settings.DATABASE_URL
+    settings.DATABASE_URL       # siempre coherente con POSTGRES_*
     settings.cors_origins_list
     settings.is_production
 
+REFACTOR (fuente de verdad de la BD)
+------------------------------------
+- Configuras POSTGRES_USER / PASSWORD / DB / HOST / PORT.
+- DATABASE_URL se ARMA sola a partir de esas piezas.
+- Si defines DATABASE_URL en el entorno, esa gana (override explícito).
 
-NOTAS / MEJORAS A FUTURO
-------------------------
-1. Evitar desfase POSTGRES_* vs DATABASE_URL:
-   Hoy existen por separado. Si cambias POSTGRES_PORT y olvidas DATABASE_URL,
-   Alembic/API apuntan mal. Mejora: construir DATABASE_URL desde POSTGRES_* 
-   (property o validator) y dejar de duplicarla en `.env`, o validar que coincidan.
+Docker Compose:
+  - En el host: POSTGRES_PORT puede ser 5433 (puerto publicado).
+  - En el servicio `api`: se fuerza POSTGRES_HOST=db y POSTGRES_PORT=5432
+    (puerto interno del contenedor Postgres).
 
-2. Validar secretos en producción:
-   Si APP_ENV=production y SECRET_KEY sigue en "change-me...", fallar al arrancar.
-
-3. HOST / PORT:
-   Hoy Uvicorn suele tomar host/puerto del CLI o de docker-compose, no de aquí.
-   O usarlos en un script de arranque, o quitarlos hasta que hagan falta.
-
-4. Tests:
-   get_settings usa lru_cache. En tests que cambien env vars, llamar:
-       get_settings.cache_clear()
-   antes de crear Settings de nuevo.
-
-5. CORS tipado:
-   Se podría parsear a list[str] con un field_validator de Pydantic
-   en lugar de una property manual (mismo resultado, un poco más “oficial”).
-
-6. No subir complejidad de más:
-   No hace falta varios Settings classes, YAML, ni consul/vault en este tamaño
-   de proyecto académico/equipo pequeño.
+Tests: si cambias env vars, llama get_settings.cache_clear().
 """
 
-from functools import lru_cache
+from __future__ import annotations
 
+from functools import lru_cache
+from typing import Self
+from urllib.parse import quote_plus
+
+from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Valores inseguros que no se permiten si APP_ENV=production.
+_INSECURE_SECRET_PREFIXES = ("change-me", "secret", "changeme")
 
 
 class Settings(BaseSettings):
     """
-    Contenedor tipado de toda la configuración.
+    Contenedor tipado de configuración (Pydantic BaseSettings).
 
-    BaseSettings (Pydantic):
-      - Declara campos con tipo (str, int, bool, ...).
-      - Busca automáticamente variables de entorno con el MISMO nombre
-        que el campo (ej. campo DATABASE_URL ← env DATABASE_URL).
-      - Si no encuentra la variable, usa el default que pones a la derecha de `=`.
+    Cada campo se rellena desde una variable de entorno del mismo nombre,
+    o desde `.env`, o con el default de la derecha.
     """
 
-    # ------------------------------------------------------------------
-    # model_config — cómo Pydantic carga el entorno
-    # ------------------------------------------------------------------
-    # SettingsConfigDict: diccionario de opciones de Pydantic Settings.
-    #
-    # env_file=".env"
-    #   Para qué: leer también el archivo .env de la raíz.
-    #   Por qué: en desarrollo no quieres exportar 15 variables a mano;
-    #   copias .env.example → .env y listo.
-    #
-    # env_file_encoding="utf-8"
-    #   Para qué: interpretar bien tildes/caracteres del .env.
-    #   Por qué: evita errores raros de encoding en distintos SO.
-    #
-    # case_sensitive=True
-    #   Para qué: DATABASE_URL y database_url NO son lo mismo.
-    #   Por qué: forzamos un convenio claro (MAYÚSCULAS) igual que en .env.example.
-    #
-    # extra="ignore"
-    #   Para qué: si el .env tiene una clave que no está en esta clase, se ignora.
-    #   Por qué: Docker u otras herramientas a veces inyectan variables de más;
-    #   no queremos que la app explote por eso.
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -103,129 +55,108 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ------------------------------------------------------------------
-    # Aplicación
-    # ------------------------------------------------------------------
-    # APP_NAME: título que ve FastAPI (docs, OpenAPI).
+    # --- Aplicación ---
     APP_NAME: str = "App Backend"
-
-    # APP_ENV: "development" | "production" | etc.
-    # Para qué: decidir comportamientos (logs, docs, validaciones).
-    # Por qué: el mismo código corre en local y en servidor con distinto modo.
     APP_ENV: str = "development"
-
-    # DEBUG: si True, FastAPI muestra más detalle y suele exponer /docs.
-    # Por qué: en producción no quieres Swagger público ni stack traces abiertos.
     DEBUG: bool = True
-
-    # API_V1_PREFIX: prefijo de todas las rutas v1 (ej. /api/v1/users).
-    # Para qué: versionar la API sin romper clientes viejos el día que exista v2.
     API_V1_PREFIX: str = "/api/v1"
 
-    # ------------------------------------------------------------------
-    # Servidor HTTP (referencia; Uvicorn a menudo lo toma del CLI/Docker)
-    # ------------------------------------------------------------------
-    # HOST: interfaz de escucha. 0.0.0.0 = acepta conexiones de fuera de localhost.
-    # Por qué en Docker/API: el contenedor debe ser alcanzable desde el host.
+    # --- HTTP (referencia; Uvicorn suele tomar host/port del CLI o Compose) ---
     HOST: str = "0.0.0.0"
-
-    # PORT: puerto HTTP de la API (por defecto 8000).
     PORT: int = 8000
 
-    # ------------------------------------------------------------------
-    # PostgreSQL (BD desacoplada)
-    # ------------------------------------------------------------------
-    # Estas piezas las usa sobre todo Docker Compose para crear el contenedor
-    # `db` (usuario, clave, nombre de base, puerto publicado en tu PC).
-    #
-    # POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB:
-    #   credenciales y nombre de la base dentro de Postgres.
+    # --- PostgreSQL (piezas = fuente de verdad) ---
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "app_db"
-
-    # POSTGRES_HOST:
-    #   - localhost  → API o Alembic corriendo en tu PC, BD en Docker publicada.
-    #   - db         → API dentro de Compose (nombre del servicio).
+    # localhost = API en el host; db = API dentro de Compose.
     POSTGRES_HOST: str = "localhost"
-
-    # POSTGRES_PORT: puerto en el HOST que mapea a 5432 del contenedor.
-    # Si 5432 está ocupado en tu PC, en .env pones 5433 (como te pasó a ti).
+    # Puerto al que se conecta el cliente (5433 en host si 5432 está ocupado;
+    # 5432 dentro de la red Docker hacia el servicio db).
     POSTGRES_PORT: int = 5432
 
-    # DATABASE_URL: cadena completa que usan SQLAlchemy y Alembic.
-    # Formato: postgresql://USER:PASSWORD@HOST:PORT/DBNAME
-    # Para qué: un solo string de conexión para el motor ORM.
-    # Por qué existe además de POSTGRES_*: la app habla por URL; Compose
-    # necesita las piezas sueltas para el contenedor oficial de Postgres.
-    # CUIDADO: deben coincidir con POSTGRES_* (ver mejoras a futuro arriba).
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/app_db"
+    # Override opcional desde env DATABASE_URL (si viene, tiene prioridad).
+    database_url_override: str | None = Field(
+        default=None,
+        validation_alias="DATABASE_URL",
+        description="Si se define, reemplaza la URL armada con POSTGRES_*.",
+    )
 
-    # ------------------------------------------------------------------
-    # Seguridad
-    # ------------------------------------------------------------------
-    # SECRET_KEY: secreto para firmar JWT u otras cosas criptográficas.
-    # Por qué no hardcodear uno “de verdad” en el código: se filtraría en Git.
-    # En producción DEBE ser largo, aleatorio y distinto por entorno.
+    # --- Seguridad ---
     SECRET_KEY: str = "change-me-in-production"
-
-    # ACCESS_TOKEN_EXPIRE_MINUTES: vida útil del access token (cuando implementes auth).
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    # ------------------------------------------------------------------
-    # CORS (Cross-Origin Resource Sharing)
-    # ------------------------------------------------------------------
-    # Lista de orígenes del frontend permitidos para llamar a la API desde el navegador.
-    # En .env van separados por coma, ej:
-    #   CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
-    # Por qué: el navegador bloquea llamadas cross-origin si no lo permites.
+    # --- CORS: orígenes separados por coma en el .env ---
     CORS_ORIGINS: str = "http://localhost:5173"
 
-    # ------------------------------------------------------------------
-    # Propiedades derivadas (no vienen del .env; se calculan)
-    # ------------------------------------------------------------------
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def DATABASE_URL(self) -> str:
+        """
+        URL de conexión para SQLAlchemy / Alembic.
+
+        Prioridad:
+          1) DATABASE_URL en el entorno (override)
+          2) Armada desde POSTGRES_*
+        """
+        if self.database_url_override:
+            return self.database_url_override
+
+        user = quote_plus(self.POSTGRES_USER)
+        password = quote_plus(self.POSTGRES_PASSWORD)
+        return (
+            f"postgresql://{user}:{password}"
+            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
+
+    @property
+    def is_production(self) -> bool:
+        """True cuando APP_ENV indica producción."""
+        return self.APP_ENV.lower() == "production"
+
     @property
     def cors_origins_list(self) -> list[str]:
-        """
-        Convierte CORS_ORIGINS (string) en lista para FastAPI CORSMiddleware.
-
-        Para qué: el middleware espera list[str], no un string con comas.
-        Por qué property: no duplicar en .env una lista “rara”; el humano
-        escribe texto simple y aquí lo partimos.
-        """
+        """Lista de orígenes para CORSMiddleware (parte CORS_ORIGINS)."""
         return [
             origin.strip()
             for origin in self.CORS_ORIGINS.split(",")
             if origin.strip()
         ]
 
-    @property
-    def is_production(self) -> bool:
-        """
-        Atajo booleano: ¿estamos en producción?
+    @field_validator("POSTGRES_PORT")
+    @classmethod
+    def port_must_be_valid(cls, value: int) -> int:
+        """El puerto debe estar en el rango TCP válido."""
+        if not 1 <= value <= 65535:
+            raise ValueError("POSTGRES_PORT must be between 1 and 65535")
+        return value
 
-        Para qué: if settings.is_production: ...
-        Por qué: no repetir .lower() == "production" por todo el código.
-        """
-        return self.APP_ENV.lower() == "production"
+    @model_validator(mode="after")
+    def reject_insecure_secret_in_production(self) -> Self:
+        """En producción, obliga a un SECRET_KEY real (no el default de plantilla)."""
+        if not self.is_production:
+            return self
+
+        key = self.SECRET_KEY.strip().lower()
+        if len(self.SECRET_KEY) < 32 or any(
+            key.startswith(prefix) for prefix in _INSECURE_SECRET_PREFIXES
+        ):
+            raise ValueError(
+                "SECRET_KEY must be a strong random value when APP_ENV=production "
+                "(min 32 chars, not a placeholder like 'change-me-...')."
+            )
+        return self
 
 
 @lru_cache
 def get_settings() -> Settings:
     """
-    Crea (y memoriza) una única instancia de Settings por proceso.
+    Una sola instancia de Settings por proceso (lru_cache).
 
-    lru_cache (functools):
-      - La primera llamada ejecuta Settings() y guarda el resultado.
-      - Las siguientes devoluciones reutilizan ese mismo objeto.
-      - Para qué: no releer el .env en cada request.
-      - Por qué: más eficiente y configuración estable durante el proceso.
-
-    En tests que muten el entorno: get_settings.cache_clear()
+    En tests que muten el entorno:
+        get_settings.cache_clear()
     """
     return Settings()
 
 
-# Instancia lista para importar en cualquier módulo:
-#   from app.core.config import settings
 settings = get_settings()
