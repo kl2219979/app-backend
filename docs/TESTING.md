@@ -214,6 +214,9 @@ Checklist PR:
 - `tests/services/test_report_service.py`
 - `tests/services/test_seed_catalog.py`
 - `tests/services/test_security_controls.py` (MFA, webhooks, admin sin MFA)
+- `tests/services/test_counterparty_service.py`
+- `tests/services/test_medio_pago_service.py`
+- `tests/services/test_schema_constraints.py` (`transactions.tipo` length)
 - `tests/repositories/test_*_repository.py`
 
 **Integration**
@@ -223,7 +226,9 @@ Checklist PR:
 - `tests/api/test_accounts.py`
 - `tests/api/test_categories.py`
 - `tests/api/test_transactions.py`
-- `tests/integration/test_postgres_smoke.py` (opt-in)
+- `tests/api/test_counterparties.py`
+- `tests/api/test_medio_pago.py`
+- `tests/integration/test_postgres_smoke.py` (opt-in; incluye check `tipo` ≥ 21)
 
 **E2E**
 
@@ -234,5 +239,22 @@ Checklist PR:
 1. Ruff  
 2. pip-audit  
 3. Pytest `-m "not e2e"` con coverage ≥ 70%  
+
+### Rate limit al testear auth en masa
+
+`RATE_LIMIT_AUTH_MAX` (default 10) / `RATE_LIMIT_AUTH_WINDOW_SECONDS` (60).
+Ráfagas de `/auth/login` → **429**. En probes manuales: espaciar requests o esperar la ventana.
+
+### Dataset demo 100 usuarios (Postgres)
+
+```bash
+docker compose up db -d
+./scripts/migrate.sh
+psql "$DATABASE_URL" -f scripts/data/demo_100_users.sql
+# regenerar: python scripts/generate_demo_100_users_sql.py
+```
+
+Login: `demo001`…`demo100` / `Password123!`  
+El seed es idempotente para correos `demo%@example.com` y mantiene saldos ≥ 0.
 
 Actualiza este inventario cuando agregues módulos relevantes.

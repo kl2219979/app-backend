@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.security import hash_password
 from app.models.account import Account
 from app.models.category import Category
+from app.models.counterparty import Counterparty
 from app.models.sub_category import SubCategory
 from app.models.transaction import Transaction
 from app.models.user import User
@@ -76,6 +77,32 @@ def make_account(
     db.flush()
     db.refresh(account)
     return account
+
+
+def make_counterparty(
+    db: Session,
+    user: User,
+    *,
+    nombre: str = "Juan Pérez",
+    banco: str | None = "Davivienda",
+    numero_cuenta: str | None = "1234567890",
+    notas: str | None = None,
+) -> Counterparty:
+    now = _now()
+    item = Counterparty(
+        user_id=user.id,
+        nombre=nombre,
+        banco=banco,
+        numero_cuenta=numero_cuenta,
+        notas=notas,
+        activo=True,
+        creado_en=now,
+        actualizado_en=now,
+    )
+    db.add(item)
+    db.flush()
+    db.refresh(item)
+    return item
 
 
 def make_category(
@@ -139,6 +166,7 @@ def make_transaction(
         sub_category_id=sub_category.id,
         monto=monto,
         tipo=tipo,
+        medio_pago="cuenta",
         fecha=fecha or date(2026, 7, 1),
         descripcion=descripcion,
         activo=True,

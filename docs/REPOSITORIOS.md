@@ -57,8 +57,18 @@ el service pone `activo=False` y llama `update`.
 |--------|-----|
 | `get_by_id` | PK |
 | `get_by_id_for_user` | Ownership (+ opcional `only_active`) |
+| `get_cash_wallet` / `get_or_create_cash_wallet` | Wallet `tipo=efectivo` por usuario+moneda |
 | `list_by_user` | Atajo activos |
 | `list_filtered` | Paginación `(items, total)` + `only_active` |
+| `create` / `update` | Persistencia |
+
+### `CounterpartyRepository` — `app/repositories/counterparty.py`
+
+| Método | Uso |
+|--------|-----|
+| `get_by_id` | PK |
+| `get_by_id_for_user` | Ownership (+ opcional `only_active`) |
+| `list_filtered` | Paginación + `only_active` |
 | `create` / `update` | Persistencia |
 
 ### `CategoryRepository` — `app/repositories/category.py`

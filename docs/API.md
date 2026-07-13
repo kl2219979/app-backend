@@ -173,6 +173,32 @@ Auth detallada: [SEGURIDAD.md](SEGURIDAD.md).
 
 ---
 
+## counterparties
+
+Agenda de terceros fuera del sistema (JWT, ownership propio).
+
+### `GET /counterparties`
+
+Query: `limit`, `offset`, `include_inactive`
+
+### `GET /counterparties/{counterparty_id}`
+
+### `POST /counterparties`
+
+Body: `nombre` (requerido), `banco`, `numero_cuenta`, `notas` (opcionales)
+
+### `PUT /counterparties/{counterparty_id}`
+
+Inactiva → 400 (reactivar primero).
+
+### `DELETE /counterparties/{counterparty_id}`
+
+Soft-delete. **204**
+
+### `POST /counterparties/{counterparty_id}/reactivate`
+
+---
+
 ## categories
 
 Lectura: cualquier JWT. Escritura: **JWT+admin+MFA**.
@@ -232,7 +258,7 @@ Soft-delete. **204**
 
 ### `POST /transactions`
 
-Body:
+Body (pago con cuenta propia):
 
 ```json
 {
@@ -241,12 +267,37 @@ Body:
   "sub_category_id": 3,
   "monto": "15.50",
   "tipo": "gasto",
+  "medio_pago": "cuenta",
+  "contraparte_id": 10,
   "fecha": "2026-07-12",
   "descripcion": "Almuerzo"
 }
 ```
 
-`tipo` solo `gasto` \| `ingreso` en create. Actualiza saldo de la cuenta.
+Body (pago en efectivo — sin `account_id`):
+
+```json
+{
+  "category_id": 2,
+  "sub_category_id": 3,
+  "monto": "15.50",
+  "tipo": "gasto",
+  "medio_pago": "efectivo",
+  "moneda": "COP",
+  "contraparte_id": 10,
+  "fecha": "2026-07-12",
+  "descripcion": "Taxi"
+}
+```
+
+Reglas:
+
+- `tipo` solo `gasto` \| `ingreso` en create.
+- `medio_pago` default `cuenta`. Con `cuenta` → `account_id` obligatorio. Con `efectivo` → `moneda` obligatoria y **no** enviar `account_id` (422).
+- `contraparte_id` opcional; debe ser propia y activa (404 si no).
+- Efectivo resuelve/crea wallet `tipo=efectivo` y actualiza su saldo.
+- Gasto (y transferencias) con monto > saldo → **400** fondos insuficientes.
+- Respuesta incluye `medio_pago`, `contraparte_id`, `account_id` (siempre el id contable).
 
 ### `POST /transactions/transfers`
 
@@ -265,13 +316,15 @@ Body:
 ```
 
 Respuesta: `{ "grupo_transferencia", "salida", "entrada" }`  
-Misma moneda obligatoria.
+Misma moneda obligatoria. Sirve también para banco↔wallet efectivo (el wallet aparece en `GET /accounts`).
+Sin `contraparte_id`.
 
 ### `GET /transactions/{transaction_id}`
 
 ### `PUT /transactions/{transaction_id}`
 
 Solo movimientos operativos (`gasto`/`ingreso`) **sin** `grupo_transferencia`.  
+Puede cambiar `medio_pago` / `account_id` / `moneda` / `contraparte_id` con las mismas reglas de create.  
 Recalcula saldos (revierte viejo, aplica nuevo).
 
 ### `DELETE /transactions/{transaction_id}`
@@ -331,13 +384,13 @@ Utilidad Python: `app.core.webhooks.sign_payload` / `verify_signature`.
 
 | Código | Cuándo |
 |--------|--------|
-| 400 | Regla de negocio (cuenta inactiva, monedas distintas, editar transferencia…) |
+| 400 | Regla de negocio (fondos insuficientes, cuenta inactiva, monedas distintas, editar transferencia, crear `tipo=efectivo`…) |
 | 401 | Sin token / token inválido / login fallido / firma webhook mala |
 | 403 | No eres el dueño / no eres admin / admin sin MFA / HTTPS requerido en prod |
 | 404 | Recurso inexistente o no tuyo (a menudo indistinguible a propósito) |
 | 409 | Conflicto (correo duplicado, nombre de categoría) |
 | 422 | Validación Pydantic (campos inválidos / `saldo` en PUT cuenta) |
-| 429 | Rate limit (auth / webhooks) |
+| 429 | Rate limit (auth / webhooks) — ver `docs/TESTING.md` si pruebas en masa |
 | 503 | Webhook sin `WEBHOOK_SECRET` configurado |
 
 ---

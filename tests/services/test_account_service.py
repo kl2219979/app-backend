@@ -79,3 +79,20 @@ def test_update_and_delete_own_account(db_session):
     assert updated.banco == "Nuevo"
     found = AccountService.get_mine(db_session, user, account.id)
     assert found.activo is False
+
+
+def test_create_rejects_manual_cash_wallet(db_session):
+    user = make_user(db_session)
+    with pytest.raises(HTTPException) as exc:
+        AccountService.create(
+            db_session,
+            user,
+            AccountCreate(
+                banco="Efectivo",
+                tipo="efectivo",
+                moneda="COP",
+                saldo_inicial=Decimal("0"),
+            ),
+        )
+    assert exc.value.status_code == 400
+    assert "efectivo" in exc.value.detail.lower()
