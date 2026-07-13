@@ -6,6 +6,7 @@ Lee en este orden si eres nuevo en el proyecto:
 |------:|-----------|----------------|
 | 1 | [README.md](../README.md) | Qué es el proyecto, cómo levantarlo en 5 minutos |
 | 2 | [COMO_FUNCIONA.md](COMO_FUNCIONA.md) | Arquitectura, capas, flujo de arranque, mapa mental |
+| 2b | [DIAGRAMAS.md](DIAGRAMAS.md) | Flujos Mermaid (capas, auth, HTTPS, reports, CI…) |
 | 3 | [NEGOCIO.md](NEGOCIO.md) | Reglas de producto: dinero, soft-delete, transferencias |
 | 4 | [MODELOS.md](MODELOS.md) | Tablas, columnas, relaciones, migraciones |
 | 5 | [API.md](API.md) | Catálogo completo de endpoints HTTP |
@@ -21,6 +22,7 @@ Lee en este orden si eres nuevo en el proyecto:
 |----------|-----------|
 | ¿Cómo enciendo el proyecto? | README → Inicio rápido |
 | ¿Por qué hay tantas carpetas en `app/`? | COMO_FUNCIONA |
+| ¿Cómo fluye una petición / un gasto? | DIAGRAMAS |
 | ¿El saldo se puede editar a mano? | NEGOCIO |
 | ¿Qué pasa si hago DELETE? | NEGOCIO + API |
 | ¿Cómo me autentico / soy admin? | SEGURIDAD + API (auth) |
