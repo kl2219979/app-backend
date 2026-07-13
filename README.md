@@ -210,7 +210,8 @@ Prefijo: `/api/v1`
 
 Listados: `{ items, total, limit, offset }`.
 
-Catálogo completo: [`docs/API.md`](docs/API.md).
+Catálogo completo: [`docs/API.md`](docs/API.md).  
+Guía para frontend: [`docs/FRONTEND.md`](docs/FRONTEND.md) + Postman en `docs/postman/`.
 
 Demo seed (100 users): `scripts/data/demo_100_users.sql` — ver [`docs/TESTING.md`](docs/TESTING.md).
 

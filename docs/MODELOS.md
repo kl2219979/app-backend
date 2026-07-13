@@ -28,12 +28,13 @@ users 1 ──────────── N accounts 1 ───────�
   │                      │  tipo=efectivo)          │    │    │
   │                      │                          │    │    │
   ├──── N counterparties ───────────────────────────┘    │    │
-  │                                                      │    │
-  └──── N refresh_tokens                                 │    │
-                                                         │    │
-categories 1 ──── N sub_categories ──────────────────────┘    │
-     │                                                        │
-     └──────────────── N transactions ────────────────────────┘
+  ├──── N budgets ───────────────────────────────────────│────┘ (por category)
+  │                                                      │
+  └──── N refresh_tokens                                 │
+                                                         │
+categories 1 ──── N sub_categories ──────────────────────┘
+     │
+     └──────────────── N transactions / budgets
 ```
 
 Una `Transaction` apunta siempre a:
@@ -41,6 +42,8 @@ Una `Transaction` apunta siempre a:
 - 1 `Account` (de quién es el dinero; si `medio_pago=efectivo`, es el wallet auto-gestionado),
 - 1 `Category` + 1 `SubCategory` (clasificación; el service valida coherencia),
 - 0..1 `Counterparty` (tercero opcional fuera del sistema).
+
+Un `Budget` es límite mensual único por `(user_id, category_id)`.
 
 ---
 
@@ -177,6 +180,23 @@ Valores de `medio_pago`:
 - `cuenta` — requiere `account_id` en la API
 - `efectivo` — requiere `moneda` en la API; el service asigna el wallet
 
+### 3.8 `budgets`
+
+Límite mensual de gasto por categoría (un registro activo por usuario+categoría).
+
+| Columna | Tipo | Notas |
+|---------|------|-------|
+| `id` | int PK | |
+| `user_id` | FK → users | Ownership |
+| `category_id` | FK → categories | Único con `user_id` |
+| `limite` | Numeric(14,2) | Meta/tope del periodo |
+| `moneda` | varchar(10) | Default COP |
+| `periodo` | varchar(20) | Solo `mensual` por ahora |
+| `activo` | bool | Soft-delete |
+| `creado_en`, `actualizado_en` | timestamptz | |
+
+El consumo del mes se calcula sumando `gasto` activos de esa categoría en el mes calendario.
+
 ---
 
 ## 4. Contabilidad (resumen técnico)
@@ -197,7 +217,7 @@ Reportes solo suman filas con `activo=true`.
 
 ## 5. Migraciones (historial Alembic)
 
-Head actual: `f6a7b8c9d0e1`.
+Head actual: `a7b8c9d0e1f2`.
 
 | Revisión | Qué aporta |
 |----------|------------|
@@ -208,6 +228,7 @@ Head actual: `f6a7b8c9d0e1`.
 | `d4e5f6a7b8c9` | `mfa_enabled` + `mfa_secret_encrypted` |
 | `e5f6a7b8c9d0` | `counterparties` + `medio_pago` / `contraparte_id` en txs |
 | `f6a7b8c9d0e1` | `transactions.tipo` ampliado a varchar(30) (cabén transferencias) |
+| `a7b8c9d0e1f2` | tabla `budgets` (límite mensual por categoría) |
 
 Aplicar:
 

@@ -251,10 +251,20 @@ Soft-delete. **204**
 - **Auth:** JWT  
 - Query:
   - `limit`, `offset`
-  - `account_id`, `category_id`
+  - `account_id`, `category_id`, `sub_category_id`, `contraparte_id`
+  - `medio_pago`: `cuenta` \| `efectivo`
   - `tipo`: `gasto` \| `ingreso` \| `transferencia_salida` \| `transferencia_entrada`
   - `date_from`, `date_to` (YYYY-MM-DD)
-- Solo movimientos **activos** del usuario
+- Solo movimientos **activos** del usuario  
+- **Orden estable:** `fecha DESC`, `id DESC` (más recientes primero)
+- Página: `{ items, total, limit, offset }`
+
+### `GET /transactions/export`
+
+- **Auth:** JWT  
+- Query: mismos filtros que el listado + `format=csv|json` (default `csv`)  
+- Descarga hasta **10_000** movimientos activos  
+- CSV: `Content-Disposition` attachment; JSON: lista de objetos
 
 ### `POST /transactions`
 
@@ -335,6 +345,36 @@ Si es transferencia, desactiva ambas piernas.
 
 ---
 
+## budgets
+
+Presupuesto mensual por categoría (`(user_id, category_id)` único).
+
+### `GET /budgets`
+
+- **Auth:** JWT — página `{ items, total, limit, offset }` (activos)
+
+### `GET /budgets/status`
+
+- **Auth:** JWT  
+- Lista de presupuestos activos con `gastado`, `restante`, `pct_usado`, `excedido` (mes calendario actual)
+
+### `GET /budgets/{budget_id}` / `GET /budgets/{budget_id}/status`
+
+### `POST /budgets`
+
+Body: `{ "category_id": 2, "limite": "500000.00", "moneda": "COP", "periodo": "mensual" }`  
+Si ya existía uno inactivo para esa categoría, lo reactiva y actualiza el límite.
+
+### `PUT /budgets/{budget_id}`
+
+### `DELETE /budgets/{budget_id}`
+
+Soft-delete → **204**
+
+### `POST /budgets/{budget_id}/reactivate`
+
+---
+
 ## reports
 
 ### `GET /reports/summary`
@@ -350,11 +390,19 @@ Respuesta (campos):
 | `total_gastos` | Suma de `tipo=gasto` activos |
 | `balance_neto` | ingresos − gastos |
 | `total_transferencias` | Suma de `transferencia_salida` |
-| `by_category_gastos` | Breakdown por categoría (gastos) |
-| `by_category_ingresos` | Breakdown por categoría (ingresos) |
+| `by_category_gastos` / `by_category_ingresos` | Breakdown por categoría |
+| `by_subcategory_gastos` / `by_subcategory_ingresos` | Breakdown por subcategoría |
+| `by_medio_pago` | Totales `cuenta` vs `efectivo` |
+| `by_counterparty` | Top 10 terceros (gastos+ingresos con `contraparte_id`) |
 | `by_month` | Totales por año/mes |
-| `by_account` | Saldo + totales por cuenta |
+| `by_account` | Saldo actual + totales por cuenta |
+| `budgets_status` | Presupuestos activos vs gasto del mes calendario |
+| `period_comparison` | Periodo actual vs anterior (mismas longitudes o mes calendario) |
 | `date_from`, `date_to`, `account_id` | Eco de filtros |
+
+`period_comparison`: con ambos filtros de fecha → ventana previa de igual duración; sin fechas → mes actual (día 1→hoy) vs mes calendario anterior. `*_change_pct` es `null` si el anterior fue 0.
+
+Guía FE: [FRONTEND.md](FRONTEND.md).
 
 ---
 

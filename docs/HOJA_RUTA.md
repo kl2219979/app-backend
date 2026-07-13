@@ -253,3 +253,23 @@
 #   saldos no negativos, ingresos tempranos, efectivo acotado
 # - Tests: schema length, fondos insuficientes, Postgres column check
 #
+# ---------------------------------------------------------------------------
+# Paso 15 — Prioridad FE: reports v2 + filtros + kit frontend
+# ---------------------------------------------------------------------------
+# Reports summary ampliado:
+#   by_subcategory_*, by_medio_pago, by_counterparty (top 10),
+#   period_comparison (ventana actual vs anterior).
+# Transactions list: filtros medio_pago, contraparte_id, sub_category_id;
+#   orden documentado fecha DESC, id DESC.
+# Kit FE: docs/FRONTEND.md + Postman collection + scripts/export_openapi.py
+#
+# ---------------------------------------------------------------------------
+# Paso 16 — Prioridad media: presupuestos, export, CI Postgres
+# ---------------------------------------------------------------------------
+# Presupuestos (`budgets`): límite mensual por categoría (CRUD + soft-delete).
+#   GET /budgets/status + budgets_status en reports/summary (mes calendario).
+# Export: GET /transactions/export?format=csv|json (mismos filtros; máx 10k).
+# CI: servicio Postgres 16 + migrate + pytest unit/API + marker `postgres`.
+# Migración: a7b8c9d0e1f2
+#
+#

@@ -171,9 +171,13 @@ Sin MFA confirmado, el admin **no puede** mutar el catálogo (403).
 
 - `total_ingresos` / `total_gastos` / `balance_neto` (ingresos − gastos)
 - `total_transferencias` (suma de salidas)
-- `by_category_gastos` / `by_category_ingresos` (separados)
+- `by_category_gastos` / `by_category_ingresos`
+- `by_subcategory_gastos` / `by_subcategory_ingresos`
+- `by_medio_pago` (cuenta vs efectivo)
+- `by_counterparty` (top 10 terceros)
 - `by_month` (buckets año-mes)
 - `by_account` (saldo actual + totales operativos por cuenta)
+- `period_comparison` (periodo actual vs anterior)
 
 Filtros opcionales: `account_id`, `date_from`, `date_to`.
 

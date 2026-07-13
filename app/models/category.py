@@ -11,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.budget import Budget
     from app.models.sub_category import SubCategory
     from app.models.transaction import Transaction
 
@@ -38,6 +39,7 @@ class Category(Base):
     # Sin cascade delete: desactivar categoría desactiva subcategorías en el service.
     sub_categories: Mapped[list[SubCategory]] = relationship(back_populates="category")
     transactions: Mapped[list[Transaction]] = relationship(back_populates="category")
+    budgets: Mapped[list[Budget]] = relationship(back_populates="category")
 
     def __repr__(self) -> str:
         return f"Category(id={self.id}, nombre={self.nombre!r}, activo={self.activo})"
