@@ -1,19 +1,11 @@
-"""
-Modelo SubCategory → tabla `sub_categories`.
-
-Relaciones:
-  SubCategory N ── 1 Category
-  SubCategory 1 ── N Transaction
-
-Ver mapa completo: docs/MODELOS.md
-"""
+"""Modelo SubCategory → tabla `sub_categories` (soft-delete vía `activo`)."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -24,12 +16,9 @@ if TYPE_CHECKING:
 
 
 class SubCategory(Base):
-    """Subcategoría dentro de una categoría (ej. Supermercado bajo Alimentación)."""
-
     __tablename__ = "sub_categories"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-
     category_id: Mapped[int] = mapped_column(
         ForeignKey("categories.id"),
         nullable=False,
@@ -37,6 +26,7 @@ class SubCategory(Base):
     )
     nombre: Mapped[str] = mapped_column(String(100), nullable=False)
     descripcion: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -54,4 +44,7 @@ class SubCategory(Base):
     transactions: Mapped[list[Transaction]] = relationship(back_populates="sub_category")
 
     def __repr__(self) -> str:
-        return f"SubCategory(id={self.id}, nombre={self.nombre!r}, category_id={self.category_id})"
+        return (
+            f"SubCategory(id={self.id}, nombre={self.nombre!r}, "
+            f"category_id={self.category_id}, activo={self.activo})"
+        )

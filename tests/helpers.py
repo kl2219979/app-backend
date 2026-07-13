@@ -42,6 +42,7 @@ def make_user(
         usuario=usuario,
         contrasena_hash=hash_password(contrasena),
         rol=rol,
+        activo=True,
         creado_en=_now(),
     )
     db.add(user)
@@ -66,6 +67,7 @@ def make_account(
         tipo=tipo,
         moneda=moneda,
         saldo=saldo,
+        activo=True,
         creado_en=now,
         actualizado_en=now,
     )
@@ -85,6 +87,7 @@ def make_category(
     category = Category(
         nombre=nombre,
         descripcion=descripcion,
+        activo=True,
         creado_en=now,
         actualizado_en=now,
     )
@@ -106,6 +109,7 @@ def make_sub_category(
         category_id=category.id,
         nombre=nombre,
         descripcion=descripcion,
+        activo=True,
         creado_en=now,
         actualizado_en=now,
     )
@@ -136,13 +140,16 @@ def make_transaction(
         tipo=tipo,
         fecha=fecha or date(2026, 7, 1),
         descripcion=descripcion,
+        activo=True,
         creado_en=now,
         actualizado_en=now,
     )
     db.add(item)
     if adjust_saldo:
-        delta = monto if tipo == "ingreso" else -monto
-        account.saldo = Decimal(account.saldo) + delta
+        if tipo in {"ingreso", "transferencia_entrada"}:
+            account.saldo = Decimal(account.saldo) + monto
+        else:
+            account.saldo = Decimal(account.saldo) - monto
     db.flush()
     db.refresh(item)
     return item

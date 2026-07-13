@@ -1,5 +1,8 @@
 """
-app/api/v1/endpoints/account.py — CRUD de cuentas (JWT)
+app/api/v1/endpoints/account.py — Cuentas (JWT)
+
+DELETE desactiva (soft-delete). POST /{id}/reactivate reactiva.
+El saldo no se edita por PUT; solo por movimientos.
 """
 
 from fastapi import APIRouter, Depends, Query, status
@@ -20,8 +23,15 @@ def list_accounts(
     current_user: User = Depends(get_current_user),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    include_inactive: bool = Query(default=False),
 ) -> Page[AccountResponse]:
-    return AccountService.list_mine(db, current_user, limit=limit, offset=offset)
+    return AccountService.list_mine(
+        db,
+        current_user,
+        limit=limit,
+        offset=offset,
+        include_inactive=include_inactive,
+    )
 
 
 @router.get("/{account_id}", response_model=AccountResponse)
@@ -53,9 +63,19 @@ def update_account(
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_account(
+def deactivate_account(
     account_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
-    AccountService.delete(db, current_user, account_id)
+    """Desactiva la cuenta. El historial de movimientos se conserva."""
+    AccountService.deactivate(db, current_user, account_id)
+
+
+@router.post("/{account_id}/reactivate", response_model=AccountResponse)
+def reactivate_account(
+    account_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return AccountService.reactivate(db, current_user, account_id)

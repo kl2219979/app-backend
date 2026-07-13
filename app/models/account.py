@@ -1,11 +1,9 @@
 """
-Modelo Account → tabla `accounts` (cuentas bancarias / billeteras).
+Modelo Account → tabla `accounts`.
 
-Relaciones:
-  Account N ── 1 User          (cada cuenta pertenece a un usuario)
-  Account 1 ── N Transaction   (una cuenta tiene muchas transacciones)
-
-Ver mapa completo: docs/MODELOS.md
+Principio contable:
+  - `saldo` solo cambia por transacciones (ingreso/gasto/transferencia).
+  - No se borra la cuenta: se desactiva (`activo=False`) y el historial permanece.
 """
 
 from __future__ import annotations
@@ -14,7 +12,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -25,20 +23,16 @@ if TYPE_CHECKING:
 
 
 class Account(Base):
-    """Cuenta financiera de un usuario (banco, tipo, moneda, saldo)."""
-
     __tablename__ = "accounts"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-
-    # FK → users.id  (antes estaba mal escrito como usuer_id)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
 
     banco: Mapped[str] = mapped_column(String(100), nullable=False)
     tipo: Mapped[str] = mapped_column(String(100), nullable=False)
     moneda: Mapped[str] = mapped_column(String(10), nullable=False)
-    # Numeric evita errores de redondeo típicos de Float con dinero.
     saldo: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=Decimal("0.00"))
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -52,14 +46,12 @@ class Account(Base):
         nullable=False,
     )
 
+    # Sin cascade delete-orphan: el historial de movimientos no se borra con la cuenta.
     user: Mapped[User] = relationship(back_populates="accounts")
-    transactions: Mapped[list[Transaction]] = relationship(
-        back_populates="account",
-        cascade="all, delete-orphan",
-    )
+    transactions: Mapped[list[Transaction]] = relationship(back_populates="account")
 
     def __repr__(self) -> str:
         return (
             f"Account(id={self.id}, banco={self.banco!r}, "
-            f"tipo={self.tipo!r}, moneda={self.moneda!r}, saldo={self.saldo})"
+            f"saldo={self.saldo}, activo={self.activo})"
         )

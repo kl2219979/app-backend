@@ -47,4 +47,5 @@ class UserResponse(BaseModel):
     correo: str
     usuario: str
     rol: str
+    activo: bool
     creado_en: datetime

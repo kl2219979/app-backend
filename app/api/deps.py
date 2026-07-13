@@ -41,7 +41,7 @@ def get_current_user(
         raise credentials_exception from None
 
     user = db.scalar(select(User).where(User.id == user_id))
-    if user is None:
+    if user is None or not user.activo:
         raise credentials_exception
 
     return user

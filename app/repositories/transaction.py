@@ -1,9 +1,5 @@
 """
 app/repositories/transaction.py — Acceso a datos de Transaction
-===============================================================
-
-Los filtros por dueño (user_id) se hacen vía Account.user_id (join),
-porque Transaction no tiene user_id directo.
 """
 
 from __future__ import annotations
@@ -18,8 +14,6 @@ from app.models.transaction import Transaction
 
 
 class TransactionRepository:
-    """CRUD de transactions."""
-
     @staticmethod
     def get_by_id(db: Session, transaction_id: int) -> Transaction | None:
         return db.get(Transaction, transaction_id)
@@ -30,15 +24,18 @@ class TransactionRepository:
         *,
         transaction_id: int,
         user_id: int,
+        only_active: bool = False,
     ) -> Transaction | None:
-        """Transacción solo si la cuenta asociada pertenece al user."""
+        filters = [
+            Transaction.id == transaction_id,
+            Account.user_id == user_id,
+        ]
+        if only_active:
+            filters.append(Transaction.activo.is_(True))
         return db.scalar(
             select(Transaction)
             .join(Account, Transaction.account_id == Account.id)
-            .where(
-                Transaction.id == transaction_id,
-                Account.user_id == user_id,
-            )
+            .where(*filters)
         )
 
     @staticmethod
@@ -46,14 +43,16 @@ class TransactionRepository:
         return list(
             db.scalars(
                 select(Transaction)
-                .where(Transaction.account_id == account_id)
+                .where(
+                    Transaction.account_id == account_id,
+                    Transaction.activo.is_(True),
+                )
                 .order_by(Transaction.fecha.desc(), Transaction.id.desc())
             ).all()
         )
 
     @staticmethod
     def list_by_user(db: Session, user_id: int) -> list[Transaction]:
-        """Todas las transacciones de todas las cuentas del usuario."""
         items, _ = TransactionRepository.list_filtered(
             db,
             user_id=user_id,
@@ -61,6 +60,14 @@ class TransactionRepository:
             offset=0,
         )
         return items
+
+    @staticmethod
+    def list_by_transfer_group(db: Session, grupo: str) -> list[Transaction]:
+        return list(
+            db.scalars(
+                select(Transaction).where(Transaction.grupo_transferencia == grupo)
+            ).all()
+        )
 
     @staticmethod
     def list_filtered(
@@ -72,11 +79,13 @@ class TransactionRepository:
         tipo: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
+        only_active: bool = True,
         limit: int = 20,
         offset: int = 0,
     ) -> tuple[list[Transaction], int]:
-        """Lista paginada con filtros opcionales. Retorna (items, total)."""
         filters = [Account.user_id == user_id]
+        if only_active:
+            filters.append(Transaction.activo.is_(True))
         if account_id is not None:
             filters.append(Transaction.account_id == account_id)
         if category_id is not None:
@@ -116,8 +125,3 @@ class TransactionRepository:
         db.flush()
         db.refresh(transaction)
         return transaction
-
-    @staticmethod
-    def delete(db: Session, transaction: Transaction) -> None:
-        db.delete(transaction)
-        db.flush()

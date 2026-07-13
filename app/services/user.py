@@ -1,9 +1,5 @@
 """
-app/services/user.py — Reglas de negocio de usuarios
-====================================================
-
-El alta pública sigue en /auth/register.
-Aquí: consultar y actualizar el propio perfil (o borrar la propia cuenta).
+app/services/user.py — Perfil propio (soft-delete)
 """
 
 from __future__ import annotations
@@ -13,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
 from app.models.user import User
+from app.repositories.refresh_token import RefreshTokenRepository
 from app.repositories.user import UserRepository
 from app.schemas.user import UserUpdate
 
@@ -20,7 +17,6 @@ from app.schemas.user import UserUpdate
 class UserService:
     @staticmethod
     def get_by_id_for_viewer(db: Session, viewer: User, user_id: int) -> User:
-        """Por ahora solo puedes ver tu propio usuario."""
         if viewer.id != user_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
         user = UserRepository.get_by_id(db, user_id)
@@ -33,6 +29,11 @@ class UserService:
 
     @staticmethod
     def update_me(db: Session, current_user: User, data: UserUpdate) -> User:
+        if not current_user.activo:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cuenta de usuario desactivada",
+            )
         payload = data.model_dump(exclude_unset=True)
         if "contrasena" in payload:
             plain = payload.pop("contrasena")
@@ -61,6 +62,9 @@ class UserService:
         return current_user
 
     @staticmethod
-    def delete_me(db: Session, current_user: User) -> None:
-        UserRepository.delete(db, current_user)
+    def deactivate_me(db: Session, current_user: User) -> None:
+        """Desactiva el usuario y revoca refresh tokens. No borra datos financieros."""
+        current_user.activo = False
+        UserRepository.update(db, current_user)
+        RefreshTokenRepository.revoke_all_for_user(db, current_user.id)
         db.commit()

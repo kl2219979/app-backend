@@ -6,7 +6,12 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-TransactionTipo = Literal["gasto", "ingreso"]
+TransactionTipo = Literal[
+    "gasto",
+    "ingreso",
+    "transferencia_salida",
+    "transferencia_entrada",
+]
 
 
 class TransactionCreate(BaseModel):
@@ -14,7 +19,7 @@ class TransactionCreate(BaseModel):
     category_id: int = Field(gt=0)
     sub_category_id: int = Field(gt=0)
     monto: Decimal = Field(gt=0)
-    tipo: TransactionTipo = "gasto"
+    tipo: Literal["gasto", "ingreso"] = "gasto"
     fecha: date
     descripcion: str = Field(default="", max_length=255)
 
@@ -24,9 +29,21 @@ class TransactionUpdate(BaseModel):
     category_id: int | None = Field(default=None, gt=0)
     sub_category_id: int | None = Field(default=None, gt=0)
     monto: Decimal | None = Field(default=None, gt=0)
-    tipo: TransactionTipo | None = None
+    tipo: Literal["gasto", "ingreso"] | None = None
     fecha: date | None = None
     descripcion: str | None = Field(default=None, max_length=255)
+
+
+class TransferCreate(BaseModel):
+    """Mueve dinero entre dos cuentas propias (misma moneda)."""
+
+    from_account_id: int = Field(gt=0)
+    to_account_id: int = Field(gt=0)
+    monto: Decimal = Field(gt=0)
+    fecha: date
+    descripcion: str = Field(default="Transferencia entre cuentas", max_length=255)
+    category_id: int = Field(gt=0)
+    sub_category_id: int = Field(gt=0)
 
 
 class TransactionResponse(BaseModel):
@@ -40,5 +57,13 @@ class TransactionResponse(BaseModel):
     tipo: TransactionTipo
     fecha: date
     descripcion: str
+    activo: bool
+    grupo_transferencia: str | None = None
     creado_en: datetime
     actualizado_en: datetime
+
+
+class TransferResponse(BaseModel):
+    grupo_transferencia: str
+    salida: TransactionResponse
+    entrada: TransactionResponse

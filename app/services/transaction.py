@@ -1,17 +1,16 @@
 """
-app/services/transaction.py — Reglas de negocio de transacciones
-================================================================
+app/services/transaction.py — Contabilidad de movimientos
 
-Validaciones clave:
-- La cuenta debe pertenecer al usuario autenticado.
-- La subcategoría debe pertenecer a la categoría indicada.
-- El saldo de la cuenta se actualiza según tipo:
-    gasto   → resta monto
-    ingreso → suma monto
+Principios:
+- El saldo de la cuenta SOLO cambia por movimientos activos.
+- No se borran movimientos: se desactivan y se revierte el impacto.
+- Transferencias = dos piernas vinculadas (salida + entrada).
+- Solo se opera sobre cuentas/categorías activas.
 """
 
 from __future__ import annotations
 
+import uuid
 from datetime import date
 from decimal import Decimal
 
@@ -26,20 +25,29 @@ from app.repositories.category import CategoryRepository
 from app.repositories.sub_category import SubCategoryRepository
 from app.repositories.transaction import TransactionRepository
 from app.schemas.pagination import Page
-from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate
+from app.schemas.transaction import (
+    TransactionCreate,
+    TransactionResponse,
+    TransactionUpdate,
+    TransferCreate,
+    TransferResponse,
+)
+
+_CREDIT_TIPOS = {"ingreso", "transferencia_entrada"}
+_DEBIT_TIPOS = {"gasto", "transferencia_salida"}
+_OPERATIVE_TIPOS = {"gasto", "ingreso"}
 
 
 class TransactionService:
     @staticmethod
     def _delta(tipo: str, monto: Decimal) -> Decimal:
-        """Impacto neto sobre el saldo de la cuenta."""
-        if tipo == "ingreso":
+        if tipo in _CREDIT_TIPOS:
             return monto
-        if tipo == "gasto":
+        if tipo in _DEBIT_TIPOS:
             return -monto
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="tipo debe ser 'gasto' o 'ingreso'",
+            detail="tipo de movimiento no válido",
         )
 
     @staticmethod
@@ -49,16 +57,16 @@ class TransactionService:
     @staticmethod
     def _ensure_category_pair(db: Session, category_id: int, sub_category_id: int) -> None:
         category = CategoryRepository.get_by_id(db, category_id)
-        if category is None:
+        if category is None or not category.activo:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Categoría no encontrada",
+                detail="Categoría no encontrada o inactiva",
             )
         sub = SubCategoryRepository.get_by_id(db, sub_category_id)
-        if sub is None:
+        if sub is None or not sub.activo:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Subcategoría no encontrada",
+                detail="Subcategoría no encontrada o inactiva",
             )
         if sub.category_id != category_id:
             raise HTTPException(
@@ -67,14 +75,14 @@ class TransactionService:
             )
 
     @staticmethod
-    def _get_own_account(db: Session, user: User, account_id: int) -> Account:
+    def _get_own_active_account(db: Session, user: User, account_id: int) -> Account:
         account = AccountRepository.get_by_id_for_user(
-            db, account_id=account_id, user_id=user.id
+            db, account_id=account_id, user_id=user.id, only_active=True
         )
         if account is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cuenta no encontrada",
+                detail="Cuenta no encontrada o inactiva",
             )
         return account
 
@@ -92,7 +100,14 @@ class TransactionService:
         offset: int = 0,
     ) -> Page[TransactionResponse]:
         if account_id is not None:
-            TransactionService._get_own_account(db, current_user, account_id)
+            account = AccountRepository.get_by_id_for_user(
+                db, account_id=account_id, user_id=current_user.id
+            )
+            if account is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Cuenta no encontrada",
+                )
         items, total = TransactionRepository.list_filtered(
             db,
             user_id=current_user.id,
@@ -101,6 +116,7 @@ class TransactionService:
             tipo=tipo,
             date_from=date_from,
             date_to=date_to,
+            only_active=True,
             limit=limit,
             offset=offset,
         )
@@ -114,18 +130,20 @@ class TransactionService:
     @staticmethod
     def get_mine(db: Session, current_user: User, transaction_id: int) -> Transaction:
         item = TransactionRepository.get_by_id_for_user(
-            db, transaction_id=transaction_id, user_id=current_user.id
+            db, transaction_id=transaction_id, user_id=current_user.id, only_active=True
         )
         if item is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Transacción no encontrada",
+                detail="Transacción no encontrada o inactiva",
             )
         return item
 
     @staticmethod
     def create(db: Session, current_user: User, data: TransactionCreate) -> Transaction:
-        account = TransactionService._get_own_account(db, current_user, data.account_id)
+        account = TransactionService._get_own_active_account(
+            db, current_user, data.account_id
+        )
         TransactionService._ensure_category_pair(db, data.category_id, data.sub_category_id)
         item = Transaction(
             account_id=data.account_id,
@@ -135,6 +153,7 @@ class TransactionService:
             tipo=data.tipo,
             fecha=data.fecha,
             descripcion=data.descripcion,
+            activo=True,
         )
         TransactionRepository.create(db, item)
         TransactionService._apply_saldo(account, TransactionService._delta(item.tipo, item.monto))
@@ -151,30 +170,41 @@ class TransactionService:
         data: TransactionUpdate,
     ) -> Transaction:
         item = TransactionService.get_mine(db, current_user, transaction_id)
-        payload = data.model_dump(exclude_unset=True)
+        if item.grupo_transferencia:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se puede editar una pierna de transferencia; "
+                "desactívala y crea una nueva",
+            )
+        if item.tipo not in _OPERATIVE_TIPOS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Solo se editan movimientos operativos (gasto/ingreso)",
+            )
 
+        payload = data.model_dump(exclude_unset=True)
         account_id = payload.get("account_id", item.account_id)
         category_id = payload.get("category_id", item.category_id)
         sub_category_id = payload.get("sub_category_id", item.sub_category_id)
         new_tipo = payload.get("tipo", item.tipo)
         new_monto = payload.get("monto", item.monto)
 
-        # Validar ANTES de tocar saldos (evita dejar la BD inconsistente).
-        old_account = TransactionService._get_own_account(db, current_user, item.account_id)
-        new_account = TransactionService._get_own_account(db, current_user, account_id)
+        old_account = TransactionService._get_own_active_account(
+            db, current_user, item.account_id
+        )
+        new_account = TransactionService._get_own_active_account(
+            db, current_user, account_id
+        )
         TransactionService._ensure_category_pair(db, category_id, sub_category_id)
-        # Valida tipo vía _delta
         _ = TransactionService._delta(new_tipo, new_monto)
 
         TransactionService._apply_saldo(
             old_account,
             -TransactionService._delta(item.tipo, item.monto),
         )
-
         for key, value in payload.items():
             setattr(item, key, value)
         TransactionRepository.update(db, item)
-
         TransactionService._apply_saldo(
             new_account,
             TransactionService._delta(item.tipo, item.monto),
@@ -182,19 +212,111 @@ class TransactionService:
         AccountRepository.update(db, old_account)
         if new_account.id != old_account.id:
             AccountRepository.update(db, new_account)
-
         db.commit()
         db.refresh(item)
         return item
 
     @staticmethod
-    def delete(db: Session, current_user: User, transaction_id: int) -> None:
+    def deactivate(db: Session, current_user: User, transaction_id: int) -> None:
+        """Soft-delete: revierte saldo y marca activo=False. Historial permanece."""
         item = TransactionService.get_mine(db, current_user, transaction_id)
-        account = TransactionService._get_own_account(db, current_user, item.account_id)
+
+        if item.grupo_transferencia:
+            legs = TransactionRepository.list_by_transfer_group(db, item.grupo_transferencia)
+            for leg in legs:
+                if not leg.activo:
+                    continue
+                account = AccountRepository.get_by_id_for_user(
+                    db, account_id=leg.account_id, user_id=current_user.id
+                )
+                if account is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Cuenta asociada a la transferencia no encontrada",
+                    )
+                TransactionService._apply_saldo(
+                    account,
+                    -TransactionService._delta(leg.tipo, leg.monto),
+                )
+                leg.activo = False
+                TransactionRepository.update(db, leg)
+                AccountRepository.update(db, account)
+            db.commit()
+            return
+
+        account = AccountRepository.get_by_id_for_user(
+            db, account_id=item.account_id, user_id=current_user.id
+        )
+        if account is None:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
         TransactionService._apply_saldo(
             account,
             -TransactionService._delta(item.tipo, item.monto),
         )
+        item.activo = False
+        TransactionRepository.update(db, item)
         AccountRepository.update(db, account)
-        TransactionRepository.delete(db, item)
         db.commit()
+
+    @staticmethod
+    def transfer(db: Session, current_user: User, data: TransferCreate) -> TransferResponse:
+        if data.from_account_id == data.to_account_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La cuenta origen y destino deben ser distintas",
+            )
+        origen = TransactionService._get_own_active_account(
+            db, current_user, data.from_account_id
+        )
+        destino = TransactionService._get_own_active_account(
+            db, current_user, data.to_account_id
+        )
+        if origen.moneda != destino.moneda:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Las transferencias requieren la misma moneda en ambas cuentas",
+            )
+        TransactionService._ensure_category_pair(db, data.category_id, data.sub_category_id)
+
+        grupo = str(uuid.uuid4())
+        desc_out = data.descripcion or "Transferencia entre cuentas"
+        salida = Transaction(
+            account_id=origen.id,
+            category_id=data.category_id,
+            sub_category_id=data.sub_category_id,
+            monto=data.monto,
+            tipo="transferencia_salida",
+            fecha=data.fecha,
+            descripcion=f"{desc_out} (salida)",
+            activo=True,
+            grupo_transferencia=grupo,
+        )
+        entrada = Transaction(
+            account_id=destino.id,
+            category_id=data.category_id,
+            sub_category_id=data.sub_category_id,
+            monto=data.monto,
+            tipo="transferencia_entrada",
+            fecha=data.fecha,
+            descripcion=f"{desc_out} (entrada)",
+            activo=True,
+            grupo_transferencia=grupo,
+        )
+        TransactionRepository.create(db, salida)
+        TransactionRepository.create(db, entrada)
+        TransactionService._apply_saldo(
+            origen, TransactionService._delta(salida.tipo, salida.monto)
+        )
+        TransactionService._apply_saldo(
+            destino, TransactionService._delta(entrada.tipo, entrada.monto)
+        )
+        AccountRepository.update(db, origen)
+        AccountRepository.update(db, destino)
+        db.commit()
+        db.refresh(salida)
+        db.refresh(entrada)
+        return TransferResponse(
+            grupo_transferencia=grupo,
+            salida=TransactionResponse.model_validate(salida),
+            entrada=TransactionResponse.model_validate(entrada),
+        )

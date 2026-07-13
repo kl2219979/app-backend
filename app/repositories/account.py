@@ -21,13 +21,12 @@ class AccountRepository:
         *,
         account_id: int,
         user_id: int,
+        only_active: bool = False,
     ) -> Account | None:
-        return db.scalar(
-            select(Account).where(
-                Account.id == account_id,
-                Account.user_id == user_id,
-            )
-        )
+        filters = [Account.id == account_id, Account.user_id == user_id]
+        if only_active:
+            filters.append(Account.activo.is_(True))
+        return db.scalar(select(Account).where(*filters))
 
     @staticmethod
     def list_by_user(db: Session, user_id: int) -> list[Account]:
@@ -41,10 +40,14 @@ class AccountRepository:
         db: Session,
         *,
         user_id: int,
+        only_active: bool = True,
         limit: int = 20,
         offset: int = 0,
     ) -> tuple[list[Account], int]:
-        base = select(Account).where(Account.user_id == user_id)
+        filters = [Account.user_id == user_id]
+        if only_active:
+            filters.append(Account.activo.is_(True))
+        base = select(Account).where(*filters)
         total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
         items = list(
             db.scalars(
@@ -66,8 +69,3 @@ class AccountRepository:
         db.flush()
         db.refresh(account)
         return account
-
-    @staticmethod
-    def delete(db: Session, account: Account) -> None:
-        db.delete(account)
-        db.flush()

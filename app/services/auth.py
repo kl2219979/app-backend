@@ -77,6 +77,11 @@ class AuthService:
                 detail="Usuario o contraseña incorrectos",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        if not user.activo:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cuenta desactivada. Contacta soporte para reactivarla.",
+            )
         return AuthService._issue_tokens(db, user)
 
     @staticmethod
@@ -90,10 +95,10 @@ class AuthService:
                 detail="Refresh token inválido o expirado",
             )
         user = UserRepository.get_by_id(db, stored.user_id)
-        if user is None:
+        if user is None or not user.activo:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Usuario no encontrado",
+                detail="Usuario no encontrado o desactivado",
             )
         # Rotación: revoca el actual y emite uno nuevo.
         RefreshTokenRepository.revoke(db, stored)

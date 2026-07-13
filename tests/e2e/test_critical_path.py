@@ -58,7 +58,12 @@ def test_critical_money_path(e2e_base_url: str):
 
         account = client.post(
             "/api/v1/accounts",
-            json={"banco": "E2E Bank", "tipo": "ahorros", "moneda": "COP", "saldo": "100"},
+            json={
+                "banco": "E2E Bank",
+                "tipo": "ahorros",
+                "moneda": "COP",
+                "saldo_inicial": "100",
+            },
             headers=headers,
         )
         assert account.status_code == 201, account.text

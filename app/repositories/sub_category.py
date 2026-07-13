@@ -27,12 +27,15 @@ class SubCategoryRepository:
         db: Session,
         *,
         category_id: int | None = None,
+        only_active: bool = True,
         limit: int = 20,
         offset: int = 0,
     ) -> tuple[list[SubCategory], int]:
         filters = []
         if category_id is not None:
             filters.append(SubCategory.category_id == category_id)
+        if only_active:
+            filters.append(SubCategory.activo.is_(True))
         base = select(SubCategory).where(*filters) if filters else select(SubCategory)
         total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
         items = list(
@@ -57,6 +60,17 @@ class SubCategoryRepository:
         return sub_category
 
     @staticmethod
-    def delete(db: Session, sub_category: SubCategory) -> None:
-        db.delete(sub_category)
+    def deactivate_by_category(db: Session, category_id: int) -> int:
+        items = list(
+            db.scalars(
+                select(SubCategory).where(
+                    SubCategory.category_id == category_id,
+                    SubCategory.activo.is_(True),
+                )
+            ).all()
+        )
+        for item in items:
+            item.activo = False
+            db.add(item)
         db.flush()
+        return len(items)

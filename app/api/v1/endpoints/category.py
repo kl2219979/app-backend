@@ -1,8 +1,7 @@
 """
-app/api/v1/endpoints/category.py — CRUD de categorías (JWT)
+app/api/v1/endpoints/category.py — Catálogo (JWT + admin escritura)
 
-Lectura: cualquier usuario autenticado.
-Escritura (POST/PUT/DELETE): solo admin.
+DELETE desactiva categoría y subcategorías hijas (no borra historial).
 """
 
 from fastapi import APIRouter, Depends, Query, status
@@ -23,9 +22,12 @@ def list_categories(
     current_user: User = Depends(get_current_user),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    include_inactive: bool = Query(default=False),
 ) -> Page[CategoryResponse]:
     _ = current_user
-    return CategoryService.list_all(db, limit=limit, offset=offset)
+    return CategoryService.list_all(
+        db, limit=limit, offset=offset, include_inactive=include_inactive
+    )
 
 
 @router.get("/{category_id}", response_model=CategoryResponse)
@@ -58,9 +60,9 @@ def update_category(
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_category(
+def deactivate_category(
     category_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
 ) -> None:
-    CategoryService.delete(db, category_id)
+    CategoryService.deactivate(db, category_id)

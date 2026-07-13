@@ -1,7 +1,5 @@
 """
-app/api/v1/endpoints/sub_category.py — CRUD de subcategorías (JWT)
-
-Lectura: cualquier autenticado. Escritura: admin.
+app/api/v1/endpoints/sub_category.py — Soft-delete de subcategorías
 """
 
 from fastapi import APIRouter, Depends, Query, status
@@ -21,12 +19,17 @@ def list_subcategories(
     category_id: int | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    include_inactive: bool = Query(default=False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Page[SubCategoryResponse]:
     _ = current_user
     return SubCategoryService.list_all(
-        db, category_id=category_id, limit=limit, offset=offset
+        db,
+        category_id=category_id,
+        limit=limit,
+        offset=offset,
+        include_inactive=include_inactive,
     )
 
 
@@ -60,9 +63,9 @@ def update_subcategory(
 
 
 @router.delete("/{subcategory_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_subcategory(
+def deactivate_subcategory(
     subcategory_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
 ) -> None:
-    SubCategoryService.delete(db, subcategory_id)
+    SubCategoryService.deactivate(db, subcategory_id)

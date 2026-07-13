@@ -1,11 +1,8 @@
 """
 Modelo User → tabla `users`.
 
-Relaciones:
-  User 1 ── N Account
-  User 1 ── N RefreshToken
-
-Ver mapa completo: docs/MODELOS.md
+No se elimina la cuenta de acceso: se desactiva (`activo=False`).
+Las cuentas financieras del usuario tampoco se borran en cascada.
 """
 
 from __future__ import annotations
@@ -13,7 +10,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, String, func
+from sqlalchemy import Boolean, Date, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -24,8 +21,6 @@ if TYPE_CHECKING:
 
 
 class User(Base):
-    """Persona/cuenta de acceso a la aplicación."""
-
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -38,8 +33,8 @@ class User(Base):
     correo: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     usuario: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     contrasena_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    # "user" | "admin" — admin puede mutar el catálogo de categorías.
     rol: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -47,10 +42,7 @@ class User(Base):
         nullable=False,
     )
 
-    accounts: Mapped[list[Account]] = relationship(
-        back_populates="user",
-        cascade="all, delete-orphan",
-    )
+    accounts: Mapped[list[Account]] = relationship(back_populates="user")
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
@@ -61,4 +53,7 @@ class User(Base):
         return self.rol == "admin"
 
     def __repr__(self) -> str:
-        return f"User(id={self.id}, usuario={self.usuario!r}, rol={self.rol!r})"
+        return (
+            f"User(id={self.id}, usuario={self.usuario!r}, "
+            f"rol={self.rol!r}, activo={self.activo})"
+        )

@@ -1,9 +1,7 @@
 """
-app/api/v1/endpoints/users.py — Perfil de usuario (JWT)
-=======================================================
+app/api/v1/endpoints/users.py — Perfil (JWT)
 
-- Alta pública: POST /auth/register (no aquí).
-- Aquí: ver/actualizar/borrar tu propio usuario.
+DELETE desactiva la cuenta de acceso; los datos financieros se conservan.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -39,11 +37,11 @@ def update_user(
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(
+def deactivate_user(
     user_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
     if current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
-    UserService.delete_me(db, current_user)
+    UserService.deactivate_me(db, current_user)

@@ -1,5 +1,5 @@
 """
-app/services/category.py — Reglas de negocio de categorías
+app/services/category.py — Catálogo (soft-delete)
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.category import Category
 from app.repositories.category import CategoryRepository
+from app.repositories.sub_category import SubCategoryRepository
 from app.schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate
 from app.schemas.pagination import Page
 
@@ -20,8 +21,11 @@ class CategoryService:
         *,
         limit: int = 20,
         offset: int = 0,
+        include_inactive: bool = False,
     ) -> Page[CategoryResponse]:
-        items, total = CategoryRepository.list_filtered(db, limit=limit, offset=offset)
+        items, total = CategoryRepository.list_filtered(
+            db, only_active=not include_inactive, limit=limit, offset=offset
+        )
         return Page[CategoryResponse](
             items=[CategoryResponse.model_validate(i) for i in items],
             total=total,
@@ -46,7 +50,11 @@ class CategoryService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Ya existe una categoría con ese nombre",
             )
-        category = Category(nombre=data.nombre, descripcion=data.descripcion)
+        category = Category(
+            nombre=data.nombre,
+            descripcion=data.descripcion,
+            activo=True,
+        )
         CategoryRepository.create(db, category)
         db.commit()
         db.refresh(category)
@@ -55,6 +63,11 @@ class CategoryService:
     @staticmethod
     def update(db: Session, category_id: int, data: CategoryUpdate) -> Category:
         category = CategoryService.get(db, category_id)
+        if not category.activo:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se puede editar una categoría inactiva",
+            )
         payload = data.model_dump(exclude_unset=True)
         if "nombre" in payload:
             other = CategoryRepository.get_by_nombre(db, payload["nombre"])
@@ -71,7 +84,12 @@ class CategoryService:
         return category
 
     @staticmethod
-    def delete(db: Session, category_id: int) -> None:
+    def deactivate(db: Session, category_id: int) -> None:
+        """Desactiva categoría y sus subcategorías. No toca transacciones históricas."""
         category = CategoryService.get(db, category_id)
-        CategoryRepository.delete(db, category)
+        if not category.activo:
+            return
+        category.activo = False
+        CategoryRepository.update(db, category)
+        SubCategoryRepository.deactivate_by_category(db, category.id)
         db.commit()

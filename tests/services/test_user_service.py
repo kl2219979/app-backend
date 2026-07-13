@@ -81,7 +81,7 @@ def test_delete_me(db_session):
     user_id = user.id
 
     # Act
-    UserService.delete_me(db_session, user)
+    UserService.deactivate_me(db_session, user)
 
     # Assert
-    assert UserRepository.get_by_id(db_session, user_id) is None
+    assert UserRepository.get_by_id(db_session, user_id).activo is False

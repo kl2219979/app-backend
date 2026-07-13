@@ -26,6 +26,7 @@ class UserPublic(BaseModel):
     correo: EmailStr
     usuario: str
     rol: str = "user"
+    activo: bool = True
 
     model_config = {"from_attributes": True}
 

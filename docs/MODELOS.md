@@ -1,99 +1,50 @@
 # Mapa del modelo de datos (SQLAlchemy)
 # =====================================
 #
-# Este documento explica las tablas, claves foráneas y cómo se relacionan.
-# El código vive en `app/models/`. Alembic crea/actualiza el esquema en Postgres.
-#
-# Convención
-# ----------
-# - Archivo / clase: singular  →  user.py / User, account.py / Account
-# - Tabla en Postgres: plural →  users, accounts, categories, ...
-# - Dinero: Numeric(14, 2) / Decimal (no Float)
-# - Fechas de auditoría: creado_en / actualizado_en con timezone
+# Principios de producto (dinero + usuarios):
+# - Soft-delete: campo `activo`. DELETE HTTP desactiva; no borra historial.
+# - Sin cascade delete-orphan en cuentas/categorías → no se pierde el ledger.
+# - Account.saldo solo cambia por movimientos (y saldo_inicial al abrir cuenta).
+# - Transferencias = dos piernas (transferencia_salida / transferencia_entrada)
+#   unidas por grupo_transferencia (UUID).
 #
 # Diagrama
 # --------
 #
 #   users 1 ──────── N accounts 1 ──────── N transactions
 #                                              │         │
-#                                              │         │
 #   categories 1 ──── N sub_categories ────────┘         │
 #        │                                               │
 #        └─────────────────── N transactions ────────────┘
-#
-#   (Transaction apunta a Account, Category y SubCategory)
 #
 # Tablas
 # ------
 #
 # users
-#   id (PK)
-#   nombres, apellidos, fecha_nacimiento, genero
-#   correo (unique), usuario (unique), contrasena_hash
-#   rol ("user" | "admin")
-#   creado_en
+#   id, nombres, apellidos, fecha_nacimiento, genero
+#   correo, usuario, contrasena_hash, rol, activo, creado_en
 #
 # refresh_tokens
-#   id (PK)
-#   user_id (FK → users.id, CASCADE)
-#   token_hash (unique, SHA-256 del refresh)
-#   expires_at, creado_en, revoked_at
+#   id, user_id, token_hash, expires_at, creado_en, revoked_at
 #
 # accounts
-#   id (PK)
-#   user_id (FK → users.id)
-#   banco, tipo, moneda, saldo
+#   id, user_id, banco, tipo, moneda, saldo, activo
 #   creado_en, actualizado_en
 #
-# categories
-#   id (PK)
-#   nombre (unique), descripcion
-#   creado_en, actualizado_en
-#
-# sub_categories
-#   id (PK)
-#   category_id (FK → categories.id)
-#   nombre, descripcion
-#   creado_en, actualizado_en
+# categories / sub_categories
+#   … + activo (desactivar categoría desactiva subcategorías hijas)
 #
 # transactions
-#   id (PK)
-#   account_id      (FK → accounts.id)
-#   category_id     (FK → categories.id)
-#   sub_category_id (FK → sub_categories.id)
-#   monto, tipo ("gasto" | "ingreso"), fecha, descripcion
+#   account_id, category_id, sub_category_id
+#   monto, tipo (gasto|ingreso|transferencia_salida|transferencia_entrada)
+#   fecha, descripcion, activo, grupo_transferencia
 #   creado_en, actualizado_en
 #
-# Nota saldo:
-#   El service ajusta Account.saldo al crear/actualizar/borrar:
-#   gasto resta, ingreso suma. Al actualizar, primero revierte el efecto
-#   anterior y luego aplica el nuevo (también si cambia de cuenta).
+# Contabilidad
+# -----------
+#   gasto / transferencia_salida  → resta saldo
+#   ingreso / transferencia_entrada → suma saldo
+#   Desactivar movimiento → revierte impacto (transferencia: ambas piernas)
+#   Reportes: gastos/ingresos operativos separados; transferencias aparte
 #
-# Nota: category_id + sub_category_id
-#   La subcategoría ya implica una categoría. Se guardan ambos para consultar
-#   fácil; en el service valida que sub_category.category_id == category_id.
-#
-# Seeds
-# -----
-#   python scripts/seed.py
-#   Carga categorías/subcategorías base (Alimentación, Transporte, …).
-#   Es idempotente: puedes correrlo varias veces.
-#
-# Archivos
-# --------
-#   app/models/user.py
-#   app/models/refresh_token.py
-#   app/models/account.py
-#   app/models/category.py
-#   app/models/sub_category.py
-#   app/models/transaction.py
-#   app/models/__init__.py   ← importa todos (Alembic los detecta)
-#
-# Crear tablas en la BD
-# ---------------------
-#   docker compose up db -d
-#   source .venv/bin/activate
-#   alembic revision --autogenerate -m "add initial schema"
-#   ./scripts/migrate.sh
-#
-# Revisar siempre el archivo generado en alembic/versions/ antes de aplicar.
+# Seeds: python scripts/seed.py (incluye categoría Transferencias)

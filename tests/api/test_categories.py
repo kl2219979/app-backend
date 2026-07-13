@@ -56,3 +56,7 @@ def test_category_and_subcategory_crud_smoke(client, admin_headers):
         client.delete(f"/api/v1/categories/{cat_id}", headers=admin_headers).status_code
         == 204
     )
+    # Soft-delete: aún se puede obtener, pero activo=false
+    got = client.get(f"/api/v1/categories/{cat_id}", headers=admin_headers)
+    assert got.status_code == 200
+    assert got.json()["activo"] is False

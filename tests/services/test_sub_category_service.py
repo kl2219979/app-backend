@@ -68,10 +68,9 @@ def test_get_and_delete(db_session):
 
     # Act
     found = SubCategoryService.get(db_session, sub.id)
-    SubCategoryService.delete(db_session, sub.id)
+    SubCategoryService.deactivate(db_session, sub.id)
 
     # Assert
     assert found.nombre == "Cafe"
-    with pytest.raises(HTTPException) as exc:
-        SubCategoryService.get(db_session, sub.id)
-    assert exc.value.status_code == 404
+    inactive = SubCategoryService.get(db_session, sub.id)
+    assert inactive.activo is False

@@ -190,7 +190,7 @@ def test_delete_restores_saldo(db_session):
     )
 
     # Act
-    TransactionService.delete(db_session, user, tx.id)
+    TransactionService.deactivate(db_session, user, tx.id)
     db_session.refresh(account)
 
     # Assert
@@ -285,7 +285,7 @@ def test_delete_own_transaction(db_session):
     tx = make_transaction(db_session, account=account, category=cat, sub_category=sub)
 
     # Act
-    TransactionService.delete(db_session, user, tx.id)
+    TransactionService.deactivate(db_session, user, tx.id)
 
     # Assert
     with pytest.raises(HTTPException) as exc:

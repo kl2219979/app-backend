@@ -28,10 +28,13 @@ class CategoryRepository:
     def list_filtered(
         db: Session,
         *,
+        only_active: bool = True,
         limit: int = 20,
         offset: int = 0,
     ) -> tuple[list[Category], int]:
         base = select(Category)
+        if only_active:
+            base = base.where(Category.activo.is_(True))
         total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
         items = list(
             db.scalars(
@@ -53,8 +56,3 @@ class CategoryRepository:
         db.flush()
         db.refresh(category)
         return category
-
-    @staticmethod
-    def delete(db: Session, category: Category) -> None:
-        db.delete(category)
-        db.flush()

@@ -21,7 +21,7 @@ def test_create_assigns_current_user(db_session):
         banco="Nequi",
         tipo="digital",
         moneda="COP",
-        saldo=Decimal("10.00"),
+        saldo_inicial=Decimal("10.00"),
     )
 
     # Act
@@ -73,10 +73,9 @@ def test_update_and_delete_own_account(db_session):
         account.id,
         AccountUpdate(banco="Nuevo"),
     )
-    AccountService.delete(db_session, user, account.id)
+    AccountService.deactivate(db_session, user, account.id)
 
     # Assert
     assert updated.banco == "Nuevo"
-    with pytest.raises(HTTPException) as exc:
-        AccountService.get_mine(db_session, user, account.id)
-    assert exc.value.status_code == 404
+    found = AccountService.get_mine(db_session, user, account.id)
+    assert found.activo is False

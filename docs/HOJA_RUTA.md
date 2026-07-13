@@ -180,3 +180,26 @@
 #
 # Docs actualizadas: REPOSITORIOS, MODELOS, este archivo.
 #
+# ---------------------------------------------------------------------------
+# Paso 10 — Consistencia contable, soft-delete y dashboard
+# ---------------------------------------------------------------------------
+# Soft-delete (`activo`):
+#   DELETE en accounts / categories / subcategories / transactions / users
+#   desactiva; no borra historial ni hace cascade wipe del ledger.
+#   POST /accounts/{id}/reactivate para reabrir una cuenta.
+#
+# Saldo:
+#   AccountCreate usa saldo_inicial (solo apertura).
+#   AccountUpdate NO permite editar saldo; solo movimientos lo cambian.
+#
+# Transferencias:
+#   POST /transactions/transfers
+#   Dos piernas + grupo_transferencia; desactivar una revierte ambas.
+#
+# Reports (dashboard):
+#   GET /reports/summary
+#   → ingresos/gastos operativos, transferencias aparte,
+#     by_category_gastos / by_category_ingresos, by_month, by_account
+#
+# Migración: c3d4e5f6a7b8 (activo + grupo_transferencia)
+#

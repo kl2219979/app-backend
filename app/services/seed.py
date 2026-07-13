@@ -22,6 +22,7 @@ SEED_CATALOG: dict[str, list[str]] = {
     "Ocio": ["Cine", "Suscripciones", "Salidas"],
     "Educación": ["Cursos", "Libros"],
     "Ingresos": ["Salario", "Freelance", "Otros ingresos"],
+    "Transferencias": ["Entre mis cuentas"],
 }
 
 

@@ -24,5 +24,6 @@ class SubCategoryResponse(BaseModel):
     category_id: int
     nombre: str
     descripcion: str
+    activo: bool
     creado_en: datetime
     actualizado_en: datetime
