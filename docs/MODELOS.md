@@ -197,7 +197,7 @@ Reportes solo suman filas con `activo=true`.
 
 ## 5. Migraciones (historial Alembic)
 
-Head actual: `e5f6a7b8c9d0`.
+Head actual: `f6a7b8c9d0e1`.
 
 | Revisión | Qué aporta |
 |----------|------------|
@@ -207,6 +207,7 @@ Head actual: `e5f6a7b8c9d0`.
 | `c3d4e5f6a7b8` | `activo` en entidades + `grupo_transferencia` |
 | `d4e5f6a7b8c9` | `mfa_enabled` + `mfa_secret_encrypted` |
 | `e5f6a7b8c9d0` | `counterparties` + `medio_pago` / `contraparte_id` en txs |
+| `f6a7b8c9d0e1` | `transactions.tipo` ampliado a varchar(30) (cabén transferencias) |
 
 Aplicar:
 

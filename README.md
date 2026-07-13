@@ -204,13 +204,15 @@ Prefijo: `/api/v1`
 | Accounts | CRUD + reactivate; create con `saldo_inicial`; wallet efectivo auto |
 | Counterparties | CRUD + reactivate; terceros fuera del sistema |
 | Categories / Subcategories | lectura JWT; escritura **admin+MFA** |
-| Transactions | CRUD + transfers; `medio_pago` cuenta/efectivo; `contraparte_id` |
+| Transactions | CRUD + transfers; `medio_pago`; `contraparte_id`; **sin sobregiro** |
 | Reports | `GET /reports/summary` |
 | Webhooks | `POST /webhooks/inbound` (HMAC) |
 
 Listados: `{ items, total, limit, offset }`.
 
 Catálogo completo: [`docs/API.md`](docs/API.md).
+
+Demo seed (100 users): `scripts/data/demo_100_users.sql` — ver [`docs/TESTING.md`](docs/TESTING.md).
 
 ---
 

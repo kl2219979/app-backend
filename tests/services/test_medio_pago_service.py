@@ -98,6 +98,21 @@ def test_create_cash_creates_wallet_and_moves_saldo(db_session):
     category = make_category(db_session)
     sub = make_sub_category(db_session, category)
 
+    # Fund cash wallet first (auto-created on first cash ingreso).
+    TransactionService.create(
+        db_session,
+        user,
+        TransactionCreate(
+            category_id=category.id,
+            sub_category_id=sub.id,
+            monto=Decimal("100"),
+            tipo="ingreso",
+            medio_pago="efectivo",
+            moneda="COP",
+            fecha=date(2026, 7, 13),
+            descripcion="Apertura efectivo",
+        ),
+    )
     item = TransactionService.create(
         db_session,
         user,
@@ -118,7 +133,7 @@ def test_create_cash_creates_wallet_and_moves_saldo(db_session):
     assert wallet.tipo == CASH_TIPO
     assert item.account_id == wallet.id
     assert item.medio_pago == "efectivo"
-    assert wallet.saldo == Decimal("-15.00")
+    assert wallet.saldo == Decimal("85.00")
 
     # Reuse same wallet on second cash tx
     TransactionService.create(
@@ -141,7 +156,32 @@ def test_create_cash_creates_wallet_and_moves_saldo(db_session):
         if a.tipo == CASH_TIPO and a.moneda == "COP"
     ]
     assert len(wallets) == 1
-    assert wallet.saldo == Decimal("-10.00")
+    assert wallet.saldo == Decimal("90.00")
+
+
+def test_create_rejects_insufficient_funds(db_session):
+    user = make_user(db_session)
+    account = make_account(db_session, user, saldo=Decimal("10"))
+    category = make_category(db_session)
+    sub = make_sub_category(db_session, category)
+
+    with pytest.raises(HTTPException) as exc:
+        TransactionService.create(
+            db_session,
+            user,
+            TransactionCreate(
+                account_id=account.id,
+                category_id=category.id,
+                sub_category_id=sub.id,
+                monto=Decimal("50"),
+                tipo="gasto",
+                fecha=date(2026, 7, 13),
+            ),
+        )
+    assert exc.value.status_code == 400
+    assert "Fondos insuficientes" in exc.value.detail
+    db_session.refresh(account)
+    assert account.saldo == Decimal("10")
 
 
 def test_schema_rejects_cash_with_account_id():

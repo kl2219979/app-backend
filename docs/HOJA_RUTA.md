@@ -243,3 +243,13 @@
 # Migración: e5f6a7b8c9d0
 # Docs: NEGOCIO, MODELOS, API, este archivo.
 #
+# ---------------------------------------------------------------------------
+# Paso 14 — Hardening contable + seed demo 100 usuarios
+# ---------------------------------------------------------------------------
+# - transactions.tipo → varchar(30) (f6a7b8c9d0e1): caben transferencia_*
+# - Fondos insuficientes → 400 en gasto / transferencia_salida
+# - POST /accounts con tipo=efectivo rechazado (wallet solo auto)
+# - Seed: scripts/data/demo_100_users.sql + generate_demo_100_users_sql.py
+#   saldos no negativos, ingresos tempranos, efectivo acotado
+# - Tests: schema length, fondos insuficientes, Postgres column check
+#

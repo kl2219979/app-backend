@@ -48,3 +48,21 @@ def test_postgres_accepts_connection_and_has_alembic_version(postgres_engine):
     assert one == 1
     assert version is not None
     assert os.getenv("RUN_INTEGRATION", "").lower() in {"1", "true", "yes"}
+
+
+def test_postgres_transaction_tipo_fits_transfer_labels(postgres_engine):
+    with postgres_engine.connect() as conn:
+        length = conn.execute(
+            text(
+                """
+                SELECT character_maximum_length
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'transactions'
+                  AND column_name = 'tipo'
+                """
+            )
+        ).scalar()
+
+    assert length is not None and length >= len("transferencia_salida")
+    assert length >= len("transferencia_entrada")

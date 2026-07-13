@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.models.account import Account
 from app.models.user import User
-from app.repositories.account import AccountRepository
+from app.repositories.account import CASH_TIPO, AccountRepository
 from app.schemas.account import AccountCreate, AccountResponse, AccountUpdate
 from app.schemas.pagination import Page
 
@@ -56,6 +56,14 @@ class AccountService:
 
     @staticmethod
     def create(db: Session, current_user: User, data: AccountCreate) -> Account:
+        if data.tipo.strip().lower() == CASH_TIPO:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "El wallet de efectivo se crea automáticamente con "
+                    "medio_pago=efectivo; no lo crees manualmente"
+                ),
+            )
         account = Account(
             user_id=current_user.id,
             banco=data.banco,
@@ -83,6 +91,35 @@ class AccountService:
                 detail="No se puede editar una cuenta inactiva; reactívala primero",
             )
         payload = data.model_dump(exclude_unset=True)
+        new_tipo = payload.get("tipo", account.tipo)
+        new_moneda = payload.get("moneda", account.moneda)
+        if str(new_tipo).strip().lower() == CASH_TIPO:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "No se puede convertir una cuenta a wallet de efectivo; "
+                    "usa medio_pago=efectivo en movimientos"
+                ),
+            )
+        if account.tipo == CASH_TIPO and ("tipo" in payload or "moneda" in payload):
+            # Keep system cash wallets stable.
+            if "tipo" in payload and payload["tipo"] != account.tipo:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No se puede cambiar el tipo del wallet de efectivo",
+                )
+            if "moneda" in payload and payload["moneda"] != account.moneda:
+                other = AccountRepository.get_cash_wallet(
+                    db,
+                    user_id=current_user.id,
+                    moneda=new_moneda,
+                    only_active=False,
+                )
+                if other is not None and other.id != account.id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Ya existe un wallet de efectivo para esa moneda",
+                    )
         for key, value in payload.items():
             setattr(account, key, value)
         AccountRepository.update(db, account)

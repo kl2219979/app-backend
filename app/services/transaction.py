@@ -58,6 +58,17 @@ class TransactionService:
         account.saldo = Decimal(account.saldo) + delta
 
     @staticmethod
+    def _ensure_sufficient_funds(account: Account, tipo: str, monto: Decimal) -> None:
+        """Gastos y transferencias-salida no pueden dejar saldo negativo."""
+        if tipo not in _DEBIT_TIPOS:
+            return
+        if Decimal(account.saldo) < Decimal(monto):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Fondos insuficientes en la cuenta",
+            )
+
+    @staticmethod
     def _ensure_category_pair(db: Session, category_id: int, sub_category_id: int) -> None:
         category = CategoryRepository.get_by_id(db, category_id)
         if category is None or not category.activo:
@@ -203,6 +214,7 @@ class TransactionService:
         TransactionService._ensure_own_active_counterparty(
             db, current_user, data.contraparte_id
         )
+        TransactionService._ensure_sufficient_funds(account, data.tipo, data.monto)
         item = Transaction(
             account_id=account.id,
             category_id=data.category_id,
@@ -301,6 +313,17 @@ class TransactionService:
             old_account,
             -TransactionService._delta(item.tipo, item.monto),
         )
+        try:
+            TransactionService._ensure_sufficient_funds(
+                new_account, new_tipo, new_monto
+            )
+        except HTTPException:
+            # Revert the temporary undo so the failed update leaves balances unchanged.
+            TransactionService._apply_saldo(
+                old_account,
+                TransactionService._delta(item.tipo, item.monto),
+            )
+            raise
         # moneda is request-only; never persist on Transaction.
         payload.pop("moneda", None)
         for key, value in payload.items():
@@ -381,6 +404,9 @@ class TransactionService:
                 detail="Las transferencias requieren la misma moneda en ambas cuentas",
             )
         TransactionService._ensure_category_pair(db, data.category_id, data.sub_category_id)
+        TransactionService._ensure_sufficient_funds(
+            origen, "transferencia_salida", data.monto
+        )
 
         grupo = str(uuid.uuid4())
         desc_out = data.descripcion or "Transferencia entre cuentas"

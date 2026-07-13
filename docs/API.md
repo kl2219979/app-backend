@@ -296,6 +296,7 @@ Reglas:
 - `medio_pago` default `cuenta`. Con `cuenta` → `account_id` obligatorio. Con `efectivo` → `moneda` obligatoria y **no** enviar `account_id` (422).
 - `contraparte_id` opcional; debe ser propia y activa (404 si no).
 - Efectivo resuelve/crea wallet `tipo=efectivo` y actualiza su saldo.
+- Gasto (y transferencias) con monto > saldo → **400** fondos insuficientes.
 - Respuesta incluye `medio_pago`, `contraparte_id`, `account_id` (siempre el id contable).
 
 ### `POST /transactions/transfers`
@@ -383,13 +384,13 @@ Utilidad Python: `app.core.webhooks.sign_payload` / `verify_signature`.
 
 | Código | Cuándo |
 |--------|--------|
-| 400 | Regla de negocio (cuenta inactiva, monedas distintas, editar transferencia…) |
+| 400 | Regla de negocio (fondos insuficientes, cuenta inactiva, monedas distintas, editar transferencia, crear `tipo=efectivo`…) |
 | 401 | Sin token / token inválido / login fallido / firma webhook mala |
 | 403 | No eres el dueño / no eres admin / admin sin MFA / HTTPS requerido en prod |
 | 404 | Recurso inexistente o no tuyo (a menudo indistinguible a propósito) |
 | 409 | Conflicto (correo duplicado, nombre de categoría) |
 | 422 | Validación Pydantic (campos inválidos / `saldo` en PUT cuenta) |
-| 429 | Rate limit (auth / webhooks) |
+| 429 | Rate limit (auth / webhooks) — ver `docs/TESTING.md` si pruebas en masa |
 | 503 | Webhook sin `WEBHOOK_SECRET` configurado |
 
 ---

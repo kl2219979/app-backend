@@ -31,6 +31,22 @@ def test_cash_transaction_and_counterparty(client, auth_headers, admin_headers):
         headers=auth_headers,
     ).json()
 
+    funded = client.post(
+        "/api/v1/transactions",
+        json={
+            "category_id": category["id"],
+            "sub_category_id": sub["id"],
+            "monto": "100.00",
+            "tipo": "ingreso",
+            "medio_pago": "efectivo",
+            "moneda": "COP",
+            "fecha": "2026-07-13",
+            "descripcion": "Apertura efectivo",
+        },
+        headers=auth_headers,
+    )
+    assert funded.status_code == 201, funded.text
+
     created = client.post(
         "/api/v1/transactions",
         json={
@@ -55,7 +71,7 @@ def test_cash_transaction_and_counterparty(client, auth_headers, admin_headers):
     accounts = client.get("/api/v1/accounts", headers=auth_headers).json()
     cash = next(a for a in accounts["items"] if a["tipo"] == "efectivo")
     assert cash["id"] == body["account_id"]
-    assert Decimal(str(cash["saldo"])) == Decimal("-12.50")
+    assert Decimal(str(cash["saldo"])) == Decimal("87.50")
 
 
 def test_cash_with_account_id_rejected(client, auth_headers, admin_headers):

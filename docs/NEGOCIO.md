@@ -27,14 +27,17 @@ Es un **tracker de finanzas personales**:
 |---------|----------------------|
 | Crear cuenta | Se acepta `saldo_inicial` (apertura / dinero que ya tenía). |
 | PUT cuenta | **Prohibido** cambiar el saldo. Solo `banco`, `tipo`, `moneda`. |
-| Crear gasto | Resta `monto` del saldo. |
+| Crear gasto | Resta `monto` del saldo (**requiere fondos suficientes**). |
 | Crear ingreso | Suma `monto` al saldo. |
-| Transferencia | Resta en origen, suma en destino (mismo monto, misma moneda). |
-| Editar movimiento | Se revierte el efecto viejo y se aplica el nuevo. |
+| Transferencia | Resta en origen (**fondos suficientes**), suma en destino. |
+| Editar movimiento | Se revierte el efecto viejo y se aplica el nuevo (mismo check de fondos). |
 | Desactivar movimiento | Se revierte el efecto; el historial permanece. |
 
 **Nunca** el frontend debe “setear” un saldo arbitrario después de crear la cuenta.
 Si el saldo no cuadra, el origen del error está en los movimientos (o en un bug).
+
+Gasto/transferencia con `monto` mayor al saldo → **400** `"Fondos insuficientes en la cuenta"`.
+No se permiten sobregiros.
 
 ### 2.2 Tipos de movimiento
 
@@ -122,7 +125,9 @@ Agenda personal de destinatarios/origenes que **no** son cuentas propias:
 | `cuenta` | `account_id` obligatorio | Usa esa cuenta propia activa |
 | `efectivo` | `moneda` obligatoria; **sin** `account_id` | Resuelve/crea wallet `tipo=efectivo`, `banco=Efectivo` por usuario+moneda |
 
-El wallet aparece en `GET /accounts` y cuenta para saldos/reportes. Banco↔efectivo se hace con `POST /transactions/transfers` hacia/desde ese wallet.
+El wallet aparece en `GET /accounts` y cuenta para saldos/reportes. **No** se crea con `POST /accounts` (`tipo=efectivo` → 400): solo vía `medio_pago=efectivo` o transferencias hacia el wallet.
+
+Banco↔efectivo se hace con `POST /transactions/transfers` hacia/desde ese wallet.
 
 ---
 
