@@ -1,10 +1,5 @@
 """
 Modelo User → tabla `users`.
-
-Relaciones:
-  User 1 ── N Account   (un usuario tiene muchas cuentas bancarias)
-
-Ver mapa completo: docs/MODELOS.md
 """
 
 from __future__ import annotations
@@ -12,18 +7,17 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, String, func
+from sqlalchemy import Boolean, Date, DateTime, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.account import Account
+    from app.models.refresh_token import RefreshToken
 
 
 class User(Base):
-    """Persona/cuenta de acceso a la aplicación."""
-
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -35,8 +29,13 @@ class User(Base):
 
     correo: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     usuario: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
-    # Nunca guardar contraseña en texto plano: solo el hash.
     contrasena_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    rol: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    # MFA TOTP (obligatorio para operar como admin).
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    mfa_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -44,11 +43,18 @@ class User(Base):
         nullable=False,
     )
 
-    # Lado "uno" de User → Accounts. back_populates debe coincidir con Account.user
-    accounts: Mapped[list[Account]] = relationship(
+    accounts: Mapped[list[Account]] = relationship(back_populates="user")
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
 
+    @property
+    def is_admin(self) -> bool:
+        return self.rol == "admin"
+
     def __repr__(self) -> str:
-        return f"User(id={self.id}, usuario={self.usuario!r})"
+        return (
+            f"User(id={self.id}, usuario={self.usuario!r}, "
+            f"rol={self.rol!r}, activo={self.activo}, mfa={self.mfa_enabled})"
+        )

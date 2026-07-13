@@ -1,28 +1,52 @@
+"""Schemas Pydantic del recurso Transaction."""
+
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+TransactionTipo = Literal[
+    "gasto",
+    "ingreso",
+    "transferencia_salida",
+    "transferencia_entrada",
+]
 
-class transactionCreate(BaseModel):
+
+class TransactionCreate(BaseModel):
     account_id: int = Field(gt=0)
     category_id: int = Field(gt=0)
     sub_category_id: int = Field(gt=0)
     monto: Decimal = Field(gt=0)
+    tipo: Literal["gasto", "ingreso"] = "gasto"
     fecha: date
-    descripcion: str = Field(max_length=255)
+    descripcion: str = Field(default="", max_length=255)
 
 
-class transactionUpdate(BaseModel):
+class TransactionUpdate(BaseModel):
     account_id: int | None = Field(default=None, gt=0)
     category_id: int | None = Field(default=None, gt=0)
     sub_category_id: int | None = Field(default=None, gt=0)
     monto: Decimal | None = Field(default=None, gt=0)
+    tipo: Literal["gasto", "ingreso"] | None = None
     fecha: date | None = None
     descripcion: str | None = Field(default=None, max_length=255)
 
 
-class transactionResponse(BaseModel):
+class TransferCreate(BaseModel):
+    """Mueve dinero entre dos cuentas propias (misma moneda)."""
+
+    from_account_id: int = Field(gt=0)
+    to_account_id: int = Field(gt=0)
+    monto: Decimal = Field(gt=0)
+    fecha: date
+    descripcion: str = Field(default="Transferencia entre cuentas", max_length=255)
+    category_id: int = Field(gt=0)
+    sub_category_id: int = Field(gt=0)
+
+
+class TransactionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -30,7 +54,16 @@ class transactionResponse(BaseModel):
     category_id: int
     sub_category_id: int
     monto: Decimal
+    tipo: TransactionTipo
     fecha: date
     descripcion: str
+    activo: bool
+    grupo_transferencia: str | None = None
     creado_en: datetime
     actualizado_en: datetime
+
+
+class TransferResponse(BaseModel):
+    grupo_transferencia: str
+    salida: TransactionResponse
+    entrada: TransactionResponse

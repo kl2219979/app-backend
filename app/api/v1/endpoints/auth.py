@@ -1,29 +1,26 @@
 """
-app/api/v1/endpoints/auth.py — Registro y login
-===============================================
-
-QUÉ ES
-------
-Endpoints públicos de autenticación:
-  POST /auth/register → crea usuario (guarda hash, no la clave en claro)
-  POST /auth/login    → verifica clave y devuelve JWT
-  GET  /auth/me       → perfil del usuario del token (ruta protegida)
-
-PRINCIPIO
----------
-El endpoint orquesta HTTP; el hashing/JWT está en app.core.security;
-la persistencia de User pasa por UserRepository.
+app/api/v1/endpoints/auth.py — Registro, login, MFA, refresh, logout, me
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.rate_limit import client_ip, enforce_rate_limit
 from app.models.user import User
-from app.repositories.user import UserRepository
-from app.schemas.auth import Token, UserPublic, UserRegister
+from app.schemas.auth import (
+    LoginResponse,
+    LogoutRequest,
+    MfaConfirmRequest,
+    MfaSetupResponse,
+    MfaVerifyRequest,
+    RefreshRequest,
+    Token,
+    UserPublic,
+    UserRegister,
+)
+from app.services.auth import AuthService
 
 router = APIRouter(prefix="/auth")
 
@@ -34,65 +31,103 @@ router = APIRouter(prefix="/auth")
     status_code=status.HTTP_201_CREATED,
     summary="Registrar usuario",
 )
-def register(body: UserRegister, db: Session = Depends(get_db)) -> User:
-    """
-    Crea un usuario nuevo.
-
-    - Comprueba que correo/usuario no existan (repository).
-    - Hashea la contraseña con bcrypt antes de guardar.
-    - Nunca persiste `contrasena` en texto plano.
-    """
-    if UserRepository.exists_correo_or_usuario(
-        db, correo=body.correo, usuario=body.usuario
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Ya existe un usuario con ese correo o nombre de usuario",
-        )
-
-    user = User(
-        nombres=body.nombres,
-        apellidos=body.apellidos,
-        fecha_nacimiento=body.fecha_nacimiento,
-        genero=body.genero,
-        correo=body.correo,
-        usuario=body.usuario,
-        contrasena_hash=hash_password(body.contrasena),
-    )
-    UserRepository.create(db, user)
-    db.commit()
-    db.refresh(user)
-    return user
+def register(
+    body: UserRegister,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> User:
+    enforce_rate_limit(request, scope="auth")
+    return AuthService.register(db, body)
 
 
 @router.post(
     "/login",
-    response_model=Token,
-    summary="Login (OAuth2 password) → JWT",
+    response_model=LoginResponse,
+    summary="Login → tokens o challenge MFA",
 )
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
+) -> LoginResponse:
+    enforce_rate_limit(request, scope="auth")
+    return AuthService.login(
+        db,
+        form_data.username,
+        form_data.password,
+        client_ip=client_ip(request),
+    )
+
+
+@router.post(
+    "/mfa/verify",
+    response_model=Token,
+    summary="Completar login admin con código TOTP",
+)
+def mfa_verify(
+    body: MfaVerifyRequest,
+    request: Request,
+    db: Session = Depends(get_db),
 ) -> Token:
-    """
-    Autentica con usuario/correo + contraseña (formulario x-www-form-urlencoded).
+    enforce_rate_limit(request, scope="auth")
+    return AuthService.verify_mfa_login(
+        db,
+        mfa_token=body.mfa_token,
+        code=body.code,
+        client_ip=client_ip(request),
+    )
 
-    Campos del form (estándar OAuth2):
-      - username: puede ser `usuario` O `correo`
-      - password: contraseña en texto plano (solo viaja en esta request)
 
-    Respuesta: { "access_token": "...", "token_type": "bearer" }
-    """
-    user = UserRepository.get_by_correo_or_usuario(db, form_data.username)
-    if user is None or not verify_password(form_data.password, user.contrasena_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario o contraseña incorrectos",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+@router.post(
+    "/mfa/setup",
+    response_model=MfaSetupResponse,
+    summary="Generar secreto TOTP (escanea con Authenticator)",
+)
+def mfa_setup(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> MfaSetupResponse:
+    return AuthService.setup_mfa(db, current_user)
 
-    token = create_access_token(subject=user.id)
-    return Token(access_token=token)
+
+@router.post(
+    "/mfa/confirm",
+    response_model=UserPublic,
+    summary="Confirmar MFA con un código válido",
+)
+def mfa_confirm(
+    body: MfaConfirmRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    return AuthService.confirm_mfa(db, current_user, body.code)
+
+
+@router.post(
+    "/refresh",
+    response_model=Token,
+    summary="Renovar access token con refresh token",
+)
+def refresh(
+    body: RefreshRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Token:
+    enforce_rate_limit(request, scope="auth")
+    return AuthService.refresh(db, body.refresh_token)
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Revocar refresh token propio (o todos)",
+)
+def logout(
+    body: LogoutRequest = LogoutRequest(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    AuthService.logout(db, body.refresh_token, user=current_user)
 
 
 @router.get(
@@ -101,5 +136,4 @@ def login(
     summary="Usuario autenticado",
 )
 def me(current_user: User = Depends(get_current_user)) -> User:
-    """Ejemplo de ruta protegida: requiere header Authorization: Bearer <token>."""
     return current_user

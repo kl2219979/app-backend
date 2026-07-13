@@ -1,16 +1,11 @@
 """
 Modelo Transaction → tabla `transactions`.
 
-Relaciones:
-  Transaction N ── 1 Account
-  Transaction N ── 1 Category
-  Transaction N ── 1 SubCategory
+tipos:
+  gasto / ingreso                 → movimientos operativos
+  transferencia_salida / _entrada → piernas de una transferencia (mismo grupo_transferencia)
 
-Nota de diseño:
-  Se guardan category_id y sub_category_id.
-  En el service conviene validar que la subcategoría pertenezca a esa categoría.
-
-Ver mapa completo: docs/MODELOS.md
+No se borran: se desactivan (`activo=False`) y se revierte el impacto en saldo.
 """
 
 from __future__ import annotations
@@ -19,7 +14,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -31,8 +26,6 @@ if TYPE_CHECKING:
 
 
 class Transaction(Base):
-    """Movimiento de dinero asociado a una cuenta y su categorización."""
-
     __tablename__ = "transactions"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -54,8 +47,12 @@ class Transaction(Base):
     )
 
     monto: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    tipo: Mapped[str] = mapped_column(String(30), nullable=False, default="gasto")
     fecha: Mapped[date] = mapped_column(Date, nullable=False)
     descripcion: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # UUID que une las dos piernas de una transferencia entre cuentas.
+    grupo_transferencia: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -75,6 +72,6 @@ class Transaction(Base):
 
     def __repr__(self) -> str:
         return (
-            f"Transaction(id={self.id}, account_id={self.account_id}, "
-            f"monto={self.monto}, fecha={self.fecha})"
+            f"Transaction(id={self.id}, tipo={self.tipo!r}, "
+            f"monto={self.monto}, activo={self.activo})"
         )

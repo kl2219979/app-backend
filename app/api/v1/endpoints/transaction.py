@@ -1,34 +1,105 @@
-from fastapi import APIRouter
-from app.schemas.transaction import transactionCreate, transactionUpdate
+"""
+app/api/v1/endpoints/transaction.py — Movimientos y transferencias (JWT)
 
-router = APIRouter()
+DELETE = desactivar (revierte saldo, conserva historial).
+POST /transfers = mover dinero entre cuentas propias.
+"""
 
+from datetime import date
+from typing import Literal
 
-@router.get("/transactions")
-def transactions_check() -> dict[str, str]:
-    """ok si el servidor HTTP está arriba"""
-    return {"status": "ok", "msg": "hola, hot-reload este el enpoint de las TRANSACCIONESS ....."}
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user, get_db
+from app.models.user import User
+from app.schemas.pagination import Page
+from app.schemas.transaction import (
+    TransactionCreate,
+    TransactionResponse,
+    TransactionUpdate,
+    TransferCreate,
+    TransferResponse,
+)
+from app.services.transaction import TransactionService
 
-@router.get("/transactions/{transaction_id}")
-def get_transaction(transaction_id: int) -> dict[str, str]:
-    """Obtiene transacción por su ID"""
-    return {"status": "ok", "msg": f"transaction {transaction_id}"}
-
-
-@router.post("/transactions")
-def create_transaction(data: transactionCreate) -> dict[str, str]:
-    """Crea una nueva transacción"""
-    return {"status": "ok", "msg": "transaction creada"}
-
-
-@router.put("/transactions/{transaction_id}")
-def update_transaction(transaction_id: int, data: transactionUpdate) -> dict[str, str]:
-    """Actualiza una transacción existente"""
-    return {"status": "ok", "msg": f"transaction {transaction_id} actualizada"}
+router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 
-@router.delete("/transactions/{transaction_id}")
-def delete_transaction(transaction_id: int) -> dict[str, str]:
-    """Elimina una transacción."""
-    return {"status": "ok", "msg": f"transaction {transaction_id} eliminada"}
+@router.get("", response_model=Page[TransactionResponse])
+def list_transactions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    account_id: int | None = Query(default=None, gt=0),
+    category_id: int | None = Query(default=None, gt=0),
+    tipo: Literal[
+        "gasto", "ingreso", "transferencia_salida", "transferencia_entrada"
+    ]
+    | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+) -> Page[TransactionResponse]:
+    return TransactionService.list_mine(
+        db,
+        current_user,
+        account_id=account_id,
+        category_id=category_id,
+        tipo=tipo,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.post(
+    "/transfers",
+    response_model=TransferResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_transfer(
+    data: TransferCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return TransactionService.transfer(db, current_user, data)
+
+
+@router.get("/{transaction_id}", response_model=TransactionResponse)
+def get_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return TransactionService.get_mine(db, current_user, transaction_id)
+
+
+@router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+def create_transaction(
+    data: TransactionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return TransactionService.create(db, current_user, data)
+
+
+@router.put("/{transaction_id}", response_model=TransactionResponse)
+def update_transaction(
+    transaction_id: int,
+    data: TransactionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return TransactionService.update(db, current_user, transaction_id, data)
+
+
+@router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deactivate_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """Desactiva el movimiento (o ambas piernas si es transferencia)."""
+    TransactionService.deactivate(db, current_user, transaction_id)

@@ -1,26 +1,26 @@
 # Cómo funciona este backend (guía paso a paso)
 
 Esta guía explica **qué es cada cosa** y **por qué existe**.
-Léela en orden la primera vez.
+Léela en orden la primera vez. Índice de toda la documentación: [INDICE.md](INDICE.md).
 
 ---
 
-## 1. La idea general (el “por qué” de todo)
+## 1. La idea general
 
 Imagina tres piezas separadas:
 
 ```
-[ Frontend Vite ]  --HTTP-->  [ API FastAPI ]  --SQL-->  [ PostgreSQL ]
-     (pantallas)               (lógica)                   (datos guardados)
+[ Frontend (Vite/React/…) ]  --HTTPS/HTTP-->  [ API FastAPI ]  --SQL-->  [ PostgreSQL ]
+        pantallas                              lógica + auth              datos persistentes
 ```
 
 - El **frontend** solo habla con la API (nunca con la base de datos).
-- La **API** decide qué se puede hacer (crear usuario, listar, etc.).
-- **PostgreSQL** solo guarda y entrega datos. No sabe de reglas de negocio.
+- La **API** decide qué se puede hacer y aplica reglas de dinero/seguridad.
+- **PostgreSQL** solo guarda y entrega filas. No sabe de JWT ni de “gasto vs ingreso”.
 
-Por eso decimos que la base está **desacoplada**:
-vive en su propio contenedor Docker, escucha en un puerto, y el resto se conecta a ella.
-Si mañana cambias el frontend o la API, la BD sigue siendo la misma “caja” de datos.
+La base está **desacoplada**: vive en su contenedor Docker; el esquema lo versiona **Alembic** junto al código.
+
+Producto (finanzas personales): [NEGOCIO.md](NEGOCIO.md).
 
 ---
 
@@ -28,145 +28,24 @@ Si mañana cambias el frontend o la API, la BD sigue siendo la misma “caja” 
 
 | Herramienta | Pregunta que responde | Analogía |
 |-------------|----------------------|----------|
-| **Docker / Postgres** | ¿Dónde corre la base y cómo la enciendo? | Una nevera: guarda cosas, no cocina. |
-| **Alembic** | ¿Cómo se crean/cambian las *tablas*? | Los planos de la cocina (dónde van los estantes). |
-| **SQLAlchemy (models)** | ¿Cómo represento una tabla en Python? | Etiquetas en español para cada estante. |
-| **Repositories** | ¿Cómo leo/escribo filas en la BD? | Abrir la nevera y sacar/guardar un plato. |
-| **Services** | ¿Está *permitido* hacer esto? | El cocinero decide la receta. |
-| **Endpoints (API)** | ¿Qué URL llama el frontend? | La ventanilla que atiende pedidos. |
-| **Schemas (Pydantic)** | ¿El JSON que llega es válido? | Revisar que el pedido tenga todos los campos. |
+| **Docker / Postgres** | ¿Dónde corre la base? | Nevera: guarda, no cocina |
+| **Alembic** | ¿Cómo cambian las tablas? | Planos de la cocina |
+| **SQLAlchemy models** | ¿Cómo se ve una tabla en Python? | Etiquetas de cada estante |
+| **Repositories** | ¿Cómo leo/escribo filas? | Abrir la nevera |
+| **Services** | ¿Está permitido? | El cocinero / la receta |
+| **Endpoints** | ¿Qué URL llama el front? | Ventanilla |
+| **Schemas (Pydantic)** | ¿El JSON es válido? | Revisar el pedido |
+| **core/security, mfa…** | ¿Cómo autenticamos y firmamos? | Llaves y candados |
 
 Regla mental:
 
-- **Alembic** = estructura (columnas, tablas) → “cómo es la nevera por dentro”.
-- **Services** = lógica → “qué platos se pueden cocinar”.
-- **Repositories** = acceso técnico → “cómo se guarda el plato”.
+- **Alembic** = estructura  
+- **Services** = lógica de negocio  
+- **Repositories** = acceso técnico  
 
 ---
 
-## 3. El flujo cuando enciendes todo
-
-### Opción A — Desarrollo (recomendada para aprender)
-
-```bash
-./scripts/setup.sh              # 1) Prepara Python
-docker compose up db -d         # 2) Enciende SOLO la base
-./scripts/migrate.sh            # 3) Crea/actualiza las tablas
-uvicorn app.main:app --reload   # 4) Enciende la API
-```
-
-Qué pasa en cada paso:
-
-1. **setup.sh**  
-   - **Qué:** crea un entorno virtual (`.venv`), instala librerías, copia `.env`.  
-   - **Por qué:** para no ensuciar el Python del sistema y tener las mismas dependencias que el equipo.
-
-2. **docker compose up db -d**  
-   - **Qué:** levanta un contenedor con PostgreSQL en el puerto 5432.  
-   - **Por qué:** así todos usan la misma versión de Postgres sin instalarla a mano.  
-   - **Importante:** en este momento la BD está **vacía** (sin tus tablas de negocio). Solo existe el motor y una base llamada `app_db`.
-
-3. **migrate.sh**  
-   - **Qué:** espera a que Postgres responda y luego ejecuta `alembic upgrade head`.  
-   - **Por qué:** las tablas las define el backend (modelos + migraciones), no el contenedor. Así el esquema viaja con el código en Git.
-
-4. **uvicorn**  
-   - **Qué:** arranca FastAPI y escucha HTTP (por defecto puerto 8000).  
-   - **Por qué:** es el proceso que atiende al frontend.
-
-### Opción B — Todo con Docker
-
-```bash
-docker compose up --build
-```
-
-Aquí el servicio `api` usa `scripts/entrypoint.sh`, que hace automáticamente:
-
-1. Esperar a Postgres (`wait_for_db.py`)
-2. Migrar (`alembic upgrade head`)
-3. Arrancar Uvicorn
-
-**Por qué un entrypoint:** si la API arranca antes que Postgres esté listo, fallaría al conectar. El entrypoint evita esa carrera.
-
----
-
-## 4. Archivo por archivo (qué / por qué)
-
-### `docker-compose.yml`
-
-- **Qué:** describe dos servicios: `db` (Postgres) y `api` (backend).
-- **Por qué:** un solo comando levanta la infraestructura. Puedes subir solo `db` si programas la API en tu máquina.
-- **Detalle clave:** `api` apunta a `POSTGRES_HOST=db` porque dentro de Docker los servicios se encuentran por **nombre de servicio**, no por `localhost`.
-
-### `Dockerfile`
-
-- **Qué:** receta para construir la imagen de la API (Python + dependencias).
-- **Por qué:** que la API corra igual en tu PC, en la de un compañero o en un servidor.
-- **Detalle:** el `ENTRYPOINT` llama a `entrypoint.sh` antes de Uvicorn.
-
-### `scripts/setup.sh`
-
-- **Qué:** prepara el entorno de desarrollo.
-- **Por qué:** un onboarding de un comando, sin pasos olvidados.
-
-### `scripts/wait_for_db.py`
-
-- **Qué:** intenta `SELECT 1` cada segundo hasta que Postgres responde (máx. ~30 s).
-- **Por qué:** Postgres tarda unos segundos en arrancar. Sin esta espera, migrate/API fallarían “a veces” de forma aleatoria.
-
-### `scripts/migrate.sh`
-
-- **Qué:** espera la BD y aplica migraciones Alembic.
-- **Por qué:** comando simple para desarrollo local cuando la API corre fuera de Docker.
-
-### `scripts/entrypoint.sh`
-
-- **Qué:** lo mismo que migrate, pero pensado para el contenedor `api`, y después ejecuta el comando final (`uvicorn ...`).
-- **Por qué:** el contenedor no debe servir HTTP con un esquema desactualizado.
-- **`exec "$@"`:** reemplaza el script por Uvicorn para que las señales (stop/restart) lleguen bien al proceso correcto.
-
-### `.env` / `.env.example`
-
-- **Qué:** contraseñas, URL de la BD, CORS, secretos.
-- **Por qué:** no hardcodear secretos en el código. `.env` no se sube a Git; `.env.example` sí (sin secretos reales).
-
-### `app/core/config.py`
-
-- **Qué:** lee el `.env` y lo expone como `settings`.
-- **Por qué:** un solo lugar para configuración; el resto del código usa `settings.DATABASE_URL`, etc.
-
-### `app/db/base.py`
-
-- **Qué:** clase `Base` de la que heredan todos los modelos.
-- **Por qué:** Alembic mira `Base.metadata` para saber qué tablas “deberían” existir.
-
-### `app/db/session.py`
-
-- **Qué:** crea el motor SQLAlchemy y la fábrica `SessionLocal`.
-- **Por qué:** abrir/cerrar conexiones de forma controlada. Aquí no hay reglas de negocio, solo el cable hacia Postgres.
-
-### `app/api/deps.py` → `get_db`
-
-- **Qué:** abre una sesión por request HTTP y la cierra al terminar.
-- **Por qué:** cada petición usa su sesión y no deja conexiones colgadas.
-
-### `alembic/env.py` + `alembic/versions/`
-
-- **Qué:** configuración de migraciones y carpeta donde se guardan los “cambios de esquema” (archivos Python generados).
-- **Por qué:** cuando agregas una columna, no editas la BD a mano: generas una revisión, la revisas, y la aplicas. El historial queda en Git.
-
-Ciclo normal cuando creas un modelo nuevo:
-
-```bash
-# 1. Escribes app/models/user.py (class User(Base): ...)
-# 2. Lo importas en app/models/__init__.py
-# 3. Generas la migración:
-alembic revision --autogenerate -m "add users"
-# 4. Aplicas:
-./scripts/migrate.sh
-```
-
-### Capas dentro de `app/`
+## 3. Capas dentro de `app/`
 
 ```
 Request HTTP
@@ -175,64 +54,173 @@ endpoints/     → reciben la petición, casi sin lógica
     ↓
 schemas/       → validan el JSON de entrada/salida
     ↓
-services/      → deciden SI se puede y QUÉ hacer (reglas)
+services/      → deciden SI se puede y QUÉ hacer
     ↓
-repositories/  → ejecutan el SQL vía SQLAlchemy
+repositories/  → ejecutan el ORM
     ↓
 PostgreSQL
 ```
 
-**Por qué tantas carpetas:** para que el proyecto no se convierta en un solo archivo gigante. Mañana puedes cambiar cómo guardas datos sin reescribir las URLs, o cambiar una regla sin tocar el SQL.
-
 | Capa | Decide | No debería |
 |------|--------|------------|
-| Endpoint | Ruta, status code, Depends | Reglas de negocio largas |
-| Service | Permisos, validaciones de dominio | Detalles de SQL |
-| Repository | Queries, `add`, `commit` | Reglas tipo “¿el usuario es admin?” |
+| Endpoint | Ruta, status, Depends | Reglas de negocio largas |
+| Service | Permisos, saldos, soft-delete | Detalles crudos de SQL |
+| Repository | Queries, flush | “¿Es admin?” |
 | Model | Columnas y relaciones | Respuestas HTTP |
 | Schema | Forma del JSON | Hablar con la BD |
 
----
-
-## 5. Qué NO hace el contenedor de la base
-
-El servicio `db`:
-
-- Sí: corre PostgreSQL, guarda datos en un volumen, abre el puerto 5432.
-- No: no crea tus tablas de usuarios/productos, no valida email, no sabe de JWT.
-
-Eso es a propósito. Si el SQL de negocio viviera dentro del contenedor:
-
-- el esquema se desincronizaría del código Python,
-- sería más difícil versionar cambios entre compañeros,
-- mezclarías infraestructura con lógica.
-
----
-
-## 6. Mapa mental rápido
+### Mapa de carpetas reales
 
 ```
-¿Quiero encender solo la BD?          → docker compose up db -d
-¿Quiero crear/actualizar tablas?      → ./scripts/migrate.sh
-¿Quiero servir la API en local?       → uvicorn app.main:app --reload
-¿Agregué un modelo nuevo?             → autogenerate + migrate
-¿Dónde pongo una regla de negocio?    → app/services/
-¿Dónde pongo un SELECT/INSERT?        → app/repositories/
-¿Dónde pongo una URL nueva?           → app/api/v1/endpoints/
+app/
+├── main.py                 # Crea FastAPI, CORS, cabeceras, router
+├── api/
+│   ├── deps.py             # get_db, get_current_user, get_current_admin
+│   └── v1/
+│       ├── router.py       # Monta todos los endpoints
+│       └── endpoints/      # auth, accounts, transactions, …
+├── core/
+│   ├── config.py           # settings desde .env
+│   ├── security.py         # bcrypt + JWT
+│   ├── mfa.py              # TOTP admin
+│   ├── rate_limit.py
+│   ├── webhooks.py         # HMAC
+│   └── logging_config.py
+├── db/                     # Base + SessionLocal
+├── models/                 # Tablas SQLAlchemy
+├── schemas/                # DTOs Pydantic
+├── services/               # Negocio (+ seed)
+└── repositories/           # Acceso a datos
 ```
 
 ---
 
-## 7. Si algo falla
+## 4. El flujo cuando enciendes todo
 
-| Síntoma | Causa probable | Qué revisar |
-|---------|----------------|-------------|
-| `Connection refused` a Postgres | La BD no está arriba | `docker compose up db -d` y `wait_for_db` |
-| API arranca pero no hay tablas | No corriste migraciones | `./scripts/migrate.sh` |
-| Autogenerate no ve tu modelo | No lo importaste | `app/models/__init__.py` |
-| Frontend no puede llamar a la API | CORS | `CORS_ORIGINS` en `.env` |
-| En Docker la API no encuentra la BD | Usaste `localhost` dentro del contenedor | En compose debe ser host `db` |
+### Opción A — Desarrollo (recomendada)
+
+```bash
+chmod +x scripts/*.sh
+./scripts/setup.sh              # 1) venv + deps + .env
+source .venv/bin/activate
+docker compose up db -d         # 2) Solo Postgres
+./scripts/migrate.sh            # 3) Tablas (Alembic)
+python scripts/seed.py          # 4) Catálogo de categorías (opcional)
+uvicorn app.main:app --reload   # 5) API
+```
+
+| Paso | Qué / por qué |
+|------|----------------|
+| `setup.sh` | Crea `.venv`, instala `requirements-dev.txt`, copia `.env.example` → `.env` |
+| `docker compose up db -d` | Postgres vacío (solo motor + DB `app_db`) |
+| `migrate.sh` | Espera BD + `alembic upgrade head` |
+| `seed.py` | Categorías base idempotentes |
+| `uvicorn` | Sirve HTTP en `:8000` |
+
+API: http://localhost:8000  
+Docs interactivas (si `DEBUG=true`): http://localhost:8000/docs
+
+### Opción B — Todo Docker
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+El `entrypoint.sh` del servicio `api`:
+
+1. Espera Postgres  
+2. Migra  
+3. Arranca Uvicorn  
+
+Dentro de Docker, `POSTGRES_HOST=db` (nombre del servicio), no `localhost`.
 
 ---
 
-Cuando entiendas esta guía, el código comentado en cada archivo refuerza el mismo mensaje: **qué hace** y **por qué está ahí**.
+## 5. Archivos de infraestructura (qué / por qué)
+
+| Archivo | Rol |
+|---------|-----|
+| `docker-compose.yml` | Servicios `db` y `api` |
+| `Dockerfile` | Imagen Python de la API |
+| `scripts/setup.sh` | Onboarding local |
+| `scripts/wait_for_db.py` | Evita carrera al arrancar Postgres |
+| `scripts/migrate.sh` | Migrar en local |
+| `scripts/entrypoint.sh` | Migrar + exec uvicorn en contenedor |
+| `scripts/seed.py` | Catálogo inicial |
+| `scripts/promote_admin.py` | Promueve rol admin (luego MFA) |
+| `.env` / `.env.example` | Secretos y config (`.env` no va a Git) |
+| `alembic/` | Historial de esquema |
+| `.github/workflows/ci.yml` | Ruff + pip-audit + pytest |
+| `.github/dependabot.yml` | PRs de dependencias |
+
+---
+
+## 6. Request autenticado (ejemplo mental)
+
+1. Cliente envía `Authorization: Bearer <access_jwt>`.
+2. `get_current_user` valida firma/exp y carga el `User` activo.
+3. El endpoint llama al service con `current_user` + body ya validado por Pydantic.
+4. El service comprueba ownership / reglas de saldo / activo.
+5. El repository persiste; el service hace `commit`.
+6. Se responde con un schema `*Response`.
+
+Si es escritura de categoría:
+
+- `get_current_admin` exige admin **y** MFA.
+
+Detalle: [SEGURIDAD.md](SEGURIDAD.md), [API.md](API.md).
+
+---
+
+## 7. Dinero en una frase
+
+> El saldo de una cuenta solo cambia por movimientos (y por `saldo_inicial` al crearla).  
+> DELETE no borra historia: desactiva.  
+> Las transferencias son dos piernas enlazadas y no cuentan como gasto del mes.
+
+Ampliar: [NEGOCIO.md](NEGOCIO.md).
+
+---
+
+## 8. Mapa mental rápido
+
+```
+¿Encender solo la BD?              → docker compose up db -d
+¿Crear/actualizar tablas?          → ./scripts/migrate.sh
+¿API local?                        → uvicorn app.main:app --reload
+¿Catálogo base?                    → python scripts/seed.py
+¿Hacer admin?                      → promote_admin + MFA setup/confirm
+¿Dónde va una regla de negocio?    → app/services/
+¿Dónde va un SELECT?               → app/repositories/
+¿Dónde va una URL nueva?           → app/api/v1/endpoints/
+¿Contrato JSON?                    → app/schemas/
+¿Tabla nueva?                      → app/models/ + Alembic
+¿Probar?                           → pytest -q   (ver TESTING.md)
+```
+
+---
+
+## 9. Si algo falla
+
+| Síntoma | Causa probable | Qué hacer |
+|---------|----------------|-----------|
+| `Connection refused` a Postgres | BD apagada | `docker compose up db -d` |
+| API sin tablas | No migraste | `./scripts/migrate.sh` |
+| Autogenerate no ve el modelo | Falta import | `app/models/__init__.py` |
+| Front no llama a la API | CORS | `CORS_ORIGINS` en `.env` |
+| API en Docker no ve la BD | Usaste `localhost` | Host debe ser `db` |
+| 429 en login durante tests | Rate limit global | Ya se limpia en conftest; reinicia suite |
+| 403 en categorías | No eres admin o sin MFA | `promote_admin` + `/auth/mfa/*` |
+| 422 al editar saldo de cuenta | Diseño intencional | Usa transacciones |
+| App no arranca en `production` | Falta SECRET/WEBHOOK/HTTPS | Ver checklist en SEGURIDAD |
+
+---
+
+## 10. Siguiente lectura
+
+1. [NEGOCIO.md](NEGOCIO.md) — comportamiento del producto  
+2. [API.md](API.md) — endpoints uno a uno  
+3. [MODELOS.md](MODELOS.md) — tablas  
+4. [SEGURIDAD.md](SEGURIDAD.md) — auth y OWASP  
+5. [TESTING.md](TESTING.md) — cómo no romper nada  

@@ -1,34 +1,47 @@
-from fastapi import APIRouter
-from app.schemas.user import userCreate, userUpdate
+"""
+app/api/v1/endpoints/users.py — Perfil (JWT)
 
-router = APIRouter()
+DELETE desactiva la cuenta de acceso; los datos financieros se conservan.
+"""
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
-@router.get("/users")
-def users_check() -> dict[str, str]:
-    """ok si el servidor HTTP está arriba"""
-    return {"status": "ok", "msg": "hola, hot-reload funcion userssss"}
+from app.api.deps import get_current_user, get_db
+from app.models.user import User
+from app.schemas.user import UserResponse, UserUpdate
+from app.services.user import UserService
 
-
-@router.get("/users/{user_id}")
-def get_user(user_id: int) -> dict[str, str]:
-    """Obtener usuario por su ID"""
-    return {"status": "ok", "msg": f"user {user_id}"}
-
-
-@router.post("/users")
-def create_user(data: userCreate) -> dict[str, str]:
-    """Crea un nuevo usuario"""
-    return {"status": "ok", "msg": "user creado"}
+router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.put("/users/{user_id}")
-def update_user(user_id: int, data: userUpdate) -> dict[str, str]:
-    """Actualiza un usuario"""
-    return {"status": "ok", "msg": f"user {user_id} actualizado"}
+@router.get("/{user_id}", response_model=UserResponse)
+def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return UserService.get_by_id_for_viewer(db, current_user, user_id)
 
 
-@router.delete("/users/{user_id}")
-def delete_user(user_id: int) -> dict[str, str]:
-    """Elimina un usuario"""
-    return {"status": "ok", "msg": f"user {user_id} eliminado"}
+@router.put("/{user_id}", response_model=UserResponse)
+def update_user(
+    user_id: int,
+    data: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
+    return UserService.update_me(db, current_user, data)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deactivate_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    if current_user.id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
+    UserService.deactivate_me(db, current_user)
