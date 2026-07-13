@@ -48,10 +48,15 @@ def get_current_user(
 
 
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
-    """Exige rol admin (catálogo de categorías, etc.)."""
+    """Exige rol admin + MFA activo (mínimo privilegio endurecido)."""
     if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Se requiere rol admin",
+        )
+    if not current_user.mfa_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Los administradores deben activar MFA (/auth/mfa/setup)",
         )
     return current_user

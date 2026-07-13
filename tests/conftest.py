@@ -29,6 +29,16 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "e2e: end-to-end contra stack vivo")
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> Generator[None, None, None]:
+    """El limiter in-memory es global; se limpia entre tests."""
+    from app.core.rate_limit import _limiter
+
+    _limiter._hits.clear()
+    yield
+    _limiter._hits.clear()
+
+
 @pytest.fixture()
 def db_session() -> Generator[Session, None, None]:
     engine = create_engine(
@@ -98,10 +108,14 @@ def admin_headers(
     registered_user: dict,
     auth_headers: dict[str, str],
 ) -> dict[str, str]:
-    """Mismo usuario que auth_headers, promovido a admin en BD."""
+    """Usuario promovido a admin con MFA ya activo (requisito de get_current_admin)."""
+    from app.core.mfa import encrypt_totp_secret, generate_totp_secret
+
     user = UserRepository.get_by_usuario(db_session, registered_user["usuario"])
     assert user is not None
     user.rol = "admin"
+    user.mfa_secret_encrypted = encrypt_totp_secret(generate_totp_secret())
+    user.mfa_enabled = True
     UserRepository.update(db_session, user)
     db_session.commit()
     return auth_headers

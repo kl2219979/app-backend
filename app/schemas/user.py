@@ -48,4 +48,5 @@ class UserResponse(BaseModel):
     usuario: str
     rol: str
     activo: bool
+    mfa_enabled: bool
     creado_en: datetime

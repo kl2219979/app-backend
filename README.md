@@ -1,258 +1,243 @@
 # App Backend
 
-API REST del proyecto, construida con **FastAPI**, **SQLAlchemy**, **Alembic** y **PostgreSQL**.
+API REST de **finanzas personales**: cuentas, movimientos (gastos/ingresos), transferencias entre cuentas, catálogo de categorías y reportes para dashboard.
 
-Arquitectura: la base de datos vive desacoplada en su propio contenedor; el backend es dueño del esquema (Alembic) y de la lógica de datos (services / repositories).
+Stack: **FastAPI** · **SQLAlchemy** · **Alembic** · **PostgreSQL** · **JWT + MFA (admin)**
 
-> **Empieza aquí si quieres entender el proyecto:**  
-> lee [`docs/COMO_FUNCIONA.md`](docs/COMO_FUNCIONA.md) — explica **qué hace cada pieza y por qué existe**, paso a paso.  
-> Mapa de tablas y FK: [`docs/MODELOS.md`](docs/MODELOS.md).  
-> Auth (hash + JWT): [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md).  
-> Repositories: [`docs/REPOSITORIOS.md`](docs/REPOSITORIOS.md).  
-> Tests (patrón AAA): [`docs/TESTING.md`](docs/TESTING.md).  
-> Hoja de ruta (pasos 1–8): [`docs/HOJA_RUTA.md`](docs/HOJA_RUTA.md).
+---
+
+## Empieza aquí (lectura)
+
+> Guía de navegación: **[`docs/INDICE.md`](docs/INDICE.md)**
+
+| Si quieres… | Abre |
+|-------------|------|
+| Entender la arquitectura paso a paso | [`docs/COMO_FUNCIONA.md`](docs/COMO_FUNCIONA.md) |
+| Reglas de dinero / soft-delete (producto) | [`docs/NEGOCIO.md`](docs/NEGOCIO.md) |
+| Tablas y migraciones | [`docs/MODELOS.md`](docs/MODELOS.md) |
+| Todos los endpoints HTTP | [`docs/API.md`](docs/API.md) |
+| Auth, MFA, OWASP, prod | [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md) |
+| Repositories | [`docs/REPOSITORIOS.md`](docs/REPOSITORIOS.md) |
+| Cómo testear | [`docs/TESTING.md`](docs/TESTING.md) |
+| Historial de evolución | [`docs/HOJA_RUTA.md`](docs/HOJA_RUTA.md) |
+
+---
 
 ## Equipo
 
+| Rol | Responsable |
+| ----- | ------------ |
+| Scrum Master | — |
+| Product Owner | — |
+| Frontend (×2) | Rama propia (repo frontend) |
+| Backend (×2) | Andrés → `dev_andres`, Kevin → `dev_kevin` |
+| QA | Kevin |
 
-| Rol           | Responsable                                |
-| ------------- | ------------------------------------------ |
-| Scrum Master  | —                                          |
-| Product Owner | —                                          |
-| Frontend (×2) | Rama propia (repo frontend)                |
-| Backend (×2)  | Andrés → `dev_andres`, Kevin → `dev_kevin` |
-| QA            | Kevin                                      |
+---
 
+## Qué hace (en una pantalla)
+
+```
+Usuario
+  ├─ se registra / inicia sesión (JWT; admin con MFA TOTP)
+  ├─ crea cuentas con saldo_inicial
+  ├─ registra gastos e ingresos  → el saldo de la cuenta cambia solo así
+  ├─ transfiere entre sus cuentas (misma moneda)
+  ├─ consulta reportes (totales, por categoría, mes, cuenta)
+  └─ “borra” = desactiva (el historial contable se conserva)
+```
+
+Admin (con MFA) mantiene el catálogo global de categorías/subcategorías.
+
+Detalle de reglas: [`docs/NEGOCIO.md`](docs/NEGOCIO.md).
+
+---
 
 ## Arquitectura de datos
 
 ```
-┌─────────────────────┐         puerto 5432          ┌──────────────────────────┐
-│  Contenedor Postgres │ ◄─────────────────────────── │  Backend (FastAPI)       │
-│  Solo motor + volumen│      DATABASE_URL            │  • Alembic → esquema     │
-│  Sin lógica de negocio│                             │  • SQLAlchemy → modelos  │
-└─────────────────────┘                             │  • Services → reglas     │
-                                                    │  • Repositories → CRUD   │
-                                                    └──────────────────────────┘
+┌─────────────────────┐                      ┌──────────────────────────┐
+│  Contenedor Postgres │ ◄──── SQL / URL ──── │  Backend (FastAPI)       │
+│  Solo motor + volumen│                      │  • Alembic → esquema     │
+│  Sin lógica de negocio│                     │  • Services → reglas     │
+└─────────────────────┘                      │  • Repositories → ORM    │
+                                             └──────────────────────────┘
 ```
 
+El frontend **nunca** habla con Postgres; solo con `/api/v1/...`.
 
-| Pieza             | Responsabilidad                                                          |
-| ----------------- | ------------------------------------------------------------------------ |
-| Contenedor `db`   | PostgreSQL listo en un puerto. Sin scripts de negocio ni DDL de dominio. |
-| Alembic           | Crea y modifica el **esquema** (`alembic upgrade head`).                 |
-| SQLAlchemy models | Mapean tablas ↔ Python.                                                  |
-| Repositories      | Cómo se lee/escribe.                                                     |
-| Services          | Qué se permite insertar/modificar (lógica de negocio).                   |
+### Capas
 
+1. **Endpoints** (`app/api/`) — HTTP, status codes, Depends  
+2. **Schemas** (`app/schemas/`) — validación Pydantic  
+3. **Services** (`app/services/`) — negocio (saldos, ownership, MFA…)  
+4. **Repositories** (`app/repositories/`) — persistencia  
+5. **Models** (`app/models/`) — tablas SQLAlchemy  
 
-El frontend **nunca** habla con Postgres; solo con la API.
+---
 
 ## Estructura del repositorio
 
 ```
 app-backend/
-├── app/
-│   ├── main.py              # Punto de entrada FastAPI
-│   ├── api/                 # Capa de presentación (rutas HTTP)
-│   │   ├── deps.py
-│   │   └── v1/
-│   │       ├── router.py
-│   │       └── endpoints/
-│   ├── core/                # Configuración y seguridad
-│   ├── db/                  # Conexión y base ORM
-│   ├── models/              # Modelos SQLAlchemy (entidades)
-│   ├── schemas/             # Esquemas Pydantic (DTOs)
-│   ├── services/            # Lógica de negocio
-│   └── repositories/        # Acceso a datos
-├── alembic/                 # Migraciones (fuente de verdad del esquema)
-│   └── versions/
-├── scripts/
-│   ├── setup.sh             # venv + deps
-│   ├── migrate.sh           # espera BD + alembic upgrade head
-│   ├── wait_for_db.py
-│   └── entrypoint.sh        # usado por el contenedor api
-├── tests/
+├── app/                    # Código de la API
+├── alembic/versions/       # Migraciones (fuente de verdad del esquema)
+├── scripts/                # setup, migrate, seed, promote_admin, entrypoint
+├── tests/                  # Pirámide unit / api / e2e
+├── docs/                   # Documentación (empieza en INDICE.md)
 ├── docker-compose.yml
 ├── Dockerfile
-└── requirements.txt
+├── requirements.txt
+├── requirements-dev.txt
+└── .env.example
 ```
 
-### Capas (clean architecture simplificada)
-
-1. **Endpoints** (`api/`) — Reciben HTTP, validan entrada, delegan a servicios.
-2. **Services** (`services/`) — Reglas de negocio, orquestan repositorios.
-3. **Repositories** (`repositories/`) — Consultas y persistencia en PostgreSQL.
-4. **Models / Schemas** — Entidades de BD y contratos de API separados.
+---
 
 ## Ramas Git
 
 ```
-main          → Producción (solo merges desde dev, vía PR)
+main          → Producción (solo merges vía PR)
   └── dev     → Integración del backend
         ├── dev_andres
         └── dev_kevin
 ```
 
-### Flujo de trabajo
+1. Trabaja en tu rama personal.  
+2. PR hacia `dev`.  
+3. Tras QA, PR `dev` → `main`.  
+4. **Nunca** push directo a `main`.
 
-1. Cada desarrollador trabaja en su rama personal (`dev_andres` / `dev_kevin`).
-2. Se hace **Pull Request** hacia `dev` para integrar cambios.
-3. Tras QA en `dev`, se promueve a `main` con otro PR.
-4. **Nunca** hacer push directo a `main`.
-
-```bash
-git clone <url-del-repo>
-cd app-backend
-cp .env.example .env
-git checkout dev_kevin   # o dev_andres
-```
+---
 
 ## Requisitos
 
-- Python 3.11+
-- Docker (para PostgreSQL)
-- pip / venv
+- Python **3.11+** (CI usa 3.12; local puede ser 3.12/3.14)  
+- Docker (PostgreSQL)  
+- pip / venv  
+
+---
 
 ## Inicio rápido
 
-### Opción A: BD desacoplada + API local (recomendado en desarrollo)
+### A) BD en Docker + API en tu máquina (recomendado)
 
 ```bash
-chmod +x scripts/setup.sh scripts/migrate.sh
+chmod +x scripts/*.sh
 ./scripts/setup.sh
 source .venv/bin/activate
 
-# 1) Solo la base de datos
 docker compose up db -d
-
-# 2) Aplicar esquema (Alembic)
 ./scripts/migrate.sh
+python scripts/seed.py          # catálogo de categorías
 
-
-
-# 3) API
 uvicorn app.main:app --reload
 ```
 
-API: [http://localhost:8000](http://localhost:8000)  
-Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+- API: http://localhost:8000  
+- Health: http://localhost:8000/api/v1/health → `{"status":"ok"}`  
+- Swagger (si `DEBUG=true`): http://localhost:8000/docs  
 
-### Opción B: Stack completo con Docker
+### B) Stack completo Docker
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-El contenedor `api` espera a Postgres, corre `alembic upgrade head` y luego arranca Uvicorn.
+El contenedor `api` espera Postgres, migra y arranca Uvicorn.
 
-## Migraciones (Alembic)
+---
 
-Cuando agregues o cambies modelos en `app/models/`:
+## Primeros pasos útiles
 
 ```bash
-# Generar revisión a partir de los modelos
-alembic revision --autogenerate -m "descripcion_del_cambio"
+# Registro / login → ver docs/API.md y docs/SEGURIDAD.md
 
-# Revisar el archivo en alembic/versions/ y luego aplicar
-./scripts/migrate.sh
-# o: alembic upgrade head
+# Promover admin (luego activar MFA obligatoriamente)
+python scripts/promote_admin.py <usuario_o_correo>
+# POST /api/v1/auth/mfa/setup  →  Authenticator  →  POST /auth/mfa/confirm
 ```
 
-Importa el modelo nuevo en `app/models/__init__.py` para que Alembic lo detecte.
+---
 
-## Comandos útiles
+## Migraciones
 
 ```bash
-# Solo Postgres
+# Tras cambiar app/models/ (y exportar en models/__init__.py):
+alembic revision --autogenerate -m "descripcion"
+# Revisar alembic/versions/…
+./scripts/migrate.sh
+```
+
+Head actual: `d4e5f6a7b8c9` (incluye soft-delete, transferencias, MFA).  
+Detalle: [`docs/MODELOS.md`](docs/MODELOS.md).
+
+---
+
+## Comandos del día a día
+
+```bash
 docker compose up db -d
-
-# Migraciones
 ./scripts/migrate.sh
-
-# Seeds (categorías iniciales, idempotente)
 python scripts/seed.py
+uvicorn app.main:app --reload
 
-# Promover admin (catálogo categories/subcategories)
-python scripts/promote_admin.py ana95
-
-# Tests
-pytest -q
+pytest -q -m "not e2e"
 pytest -q -m "not e2e" --cov=app --cov-fail-under=70
-
-# Linter
 ruff check app tests
+pip-audit -r requirements.txt -r requirements-dev.txt
 ```
 
-CI en GitHub Actions (`.github/workflows/ci.yml`): Ruff + Pytest en cada push/PR a `main`/`dev`.
+CI (GitHub Actions): Ruff + **pip-audit** + Pytest con coverage ≥ 70%.
 
-Guía completa (pirámide, AAA, markers, política PR): [`docs/TESTING.md`](docs/TESTING.md).
+---
 
-### Auth (tokens)
+## API (resumen)
 
-```http
-POST /api/v1/auth/login          → access_token + refresh_token
-POST /api/v1/auth/refresh        { "refresh_token": "..." }
-POST /api/v1/auth/logout         Bearer + opcional { "refresh_token" }
-```
+Prefijo: `/api/v1`
 
-### Listados paginados
+| Área | Ejemplos |
+|------|----------|
+| Auth | register, login, MFA, refresh, logout, me |
+| Users | perfil propio (GET/PUT/DELETE = desactivar) |
+| Accounts | CRUD + reactivate; create con `saldo_inicial` |
+| Categories / Subcategories | lectura JWT; escritura **admin+MFA** |
+| Transactions | CRUD + `POST /transactions/transfers` |
+| Reports | `GET /reports/summary` |
+| Webhooks | `POST /webhooks/inbound` (HMAC) |
 
-Accounts, categories, subcategories y transactions responden:
+Listados: `{ items, total, limit, offset }`.
 
-```json
-{ "items": [ ... ], "total": 42, "limit": 20, "offset": 0 }
-```
+Catálogo completo: [`docs/API.md`](docs/API.md).
 
-### Reports
-
-```http
-GET /api/v1/reports/summary?date_from=2026-01-01&date_to=2026-12-31
-Authorization: Bearer <token>
-```
-
-`tipo` en transactions: `gasto` (resta saldo) o `ingreso` (suma saldo).
-Categories/subcategories: **escritura solo admin**.
+---
 
 ## Variables de entorno
 
-Copia `.env.example` a `.env` y ajusta los valores. **No subas `.env` al repositorio.**
+Copia `.env.example` → `.env`. **No subas `.env`.**
 
+| Variable | Rol |
+|----------|-----|
+| `POSTGRES_*` | Conexión (la URL se arma en `config.py`) |
+| `SECRET_KEY` | JWT + cifrado MFA |
+| `WEBHOOK_SECRET` | Firma de webhooks |
+| `FORCE_HTTPS` | Obligatorio `true` en production |
+| `CORS_ORIGINS` | Frontends permitidos |
+| `APP_ENV` | `production` activa guards duros |
+| `DEBUG` | Docs Swagger; forzado a `false` en production |
 
-| Variable       | Descripción                                                      |
-| -------------- | ---------------------------------------------------------------- |
-| `POSTGRES_*`   | Piezas de conexión a Postgres (la URL se arma sola en `config.py`) |
-| `SECRET_KEY`   | Clave para tokens JWT                                            |
-| `CORS_ORIGINS` | Orígenes permitidos del frontend (Vite: `http://localhost:5173`) |
+Checklist production: [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md).
 
+---
 
 ## QA
 
-Kevin es responsable de QA. Las pruebas viven en `tests/` y siguen la pirámide:
-**muchos unitarios**, **algunos de integración**, **pocos E2E** (ver [`docs/TESTING.md`](docs/TESTING.md)).
-
-Antes de cada PR hacia `dev`:
+Antes de cada PR a `dev`:
 
 ```bash
-pytest -q
+pytest -q -m "not e2e"
+ruff check app tests
 ```
 
-Checklist mínimo:
-
-- Nuevas reglas de negocio → `tests/services/`
-- SQL no trivial → `tests/repositories/`
-- Contrato HTTP nuevo → un smoke en `tests/api/` (no duplicar toda la lógica)
-
-## Crear el repositorio en GitHub
-
-Si aún no existe el remoto:
-
-```bash
-# En GitHub: New repository → app-backend (sin README ni .gitignore)
-
-git remote add origin https://github.com/<tu-usuario>/app-backend.git
-git push -u origin main
-git push -u origin dev dev_andres dev_kevin
-```
-
+Política completa: [`docs/TESTING.md`](docs/TESTING.md).

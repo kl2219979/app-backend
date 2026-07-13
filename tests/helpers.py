@@ -43,6 +43,7 @@ def make_user(
         contrasena_hash=hash_password(contrasena),
         rol=rol,
         activo=True,
+        mfa_enabled=False,
         creado_en=_now(),
     )
     db.add(user)

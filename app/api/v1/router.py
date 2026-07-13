@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     sub_category,
     transaction,
     users,
+    webhooks,
 )
 
 api_router = APIRouter()
@@ -24,3 +25,4 @@ api_router.include_router(category.router)
 api_router.include_router(sub_category.router)
 api_router.include_router(transaction.router)
 api_router.include_router(reports.router)
+api_router.include_router(webhooks.router)

@@ -34,6 +34,7 @@ def main() -> None:
         UserRepository.update(db, user)
         db.commit()
         print(f"[promote] {user.usuario} ahora es admin (id={user.id})")
+        print("[promote] Activa MFA: POST /auth/mfa/setup → confirm (obligatorio para catálogo)")
     finally:
         db.close()
 

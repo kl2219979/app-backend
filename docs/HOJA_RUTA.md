@@ -1,7 +1,9 @@
-# Hoja de ruta — pasos 1 a 5 (implementados)
-# ==========================================
+# Hoja de ruta — historial de maduración (pasos 1–12)
+# ==================================================
 #
-# Este documento describe qué se hizo en cada paso de maduración del backend.
+# Este documento es un DIARIO de lo que se implementó en cada etapa.
+# No es la guía de onboarding: para eso empieza en docs/INDICE.md
+# y docs/COMO_FUNCIONA.md.
 #
 # ---------------------------------------------------------------------------
 # Paso 1 — Unificar Alembic (un solo head)
@@ -202,4 +204,26 @@
 #     by_category_gastos / by_category_ingresos, by_month, by_account
 #
 # Migración: c3d4e5f6a7b8 (activo + grupo_transferencia)
+#
+# ---------------------------------------------------------------------------
+# Paso 11 — Hardening OWASP (seguridad completa)
+# ---------------------------------------------------------------------------
+# Rate limit auth/webhooks, logs de auth fallidos, MFA TOTP admin,
+# CORS estricto, DEBUG=False en production, FORCE_HTTPS + HSTS,
+# webhooks HMAC (/webhooks/inbound), pip-audit + Dependabot.
+# Ver docs/SEGURIDAD.md. Migración MFA: d4e5f6a7b8c9
+#
+# ---------------------------------------------------------------------------
+# Paso 12 — Documentación alineada con la realidad del proyecto
+# ---------------------------------------------------------------------------
+# Se reescribió/amplió la documentación para onboarding sin conocimiento previo:
+#   docs/INDICE.md      → mapa de lectura
+#   docs/COMO_FUNCIONA.md
+#   docs/NEGOCIO.md      → dinero, soft-delete, transferencias, reportes
+#   docs/MODELOS.md
+#   docs/API.md          → catálogo HTTP completo
+#   docs/SEGURIDAD.md
+#   docs/REPOSITORIOS.md
+#   docs/TESTING.md
+#   README.md
 #

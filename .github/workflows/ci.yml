@@ -1,4 +1,4 @@
-# CI — lint + unit/API tests + coverage gate
+# CI — lint + security audit + unit/API tests + coverage gate
 name: CI
 
 on:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    name: Ruff + Pytest + Coverage
+    name: Ruff + pip-audit + Pytest
     runs-on: ubuntu-latest
 
     steps:
@@ -29,6 +29,9 @@ jobs:
 
       - name: Ruff (lint)
         run: ruff check app tests
+
+      - name: pip-audit (vulnerable components)
+        run: pip-audit -r requirements.txt -r requirements-dev.txt
 
       - name: Pytest with coverage gate
         run: >

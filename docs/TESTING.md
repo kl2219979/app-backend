@@ -1,14 +1,15 @@
-"""
-Guía de testing del backend
-===========================
+# Guía de testing del backend
 
-Este documento es la referencia completa de cómo (y por qué) testamos.
-Complementa el patrón AAA con la **pirámide de tests** del equipo.
+Referencia de cómo (y por qué) testamos.
+Complementa el patrón AAA con la **pirámide de tests**.
 
----------------------------------------------------------------------------
-1. Principio del equipo (pirámide)
----------------------------------------------------------------------------
+Índice general: [INDICE.md](INDICE.md).
 
+---
+
+## 1. Principio del equipo (pirámide)
+
+```
     ┌─────────────────────────────┐
     │  E2E (pocos)                │  Stack vivo: API + Postgres reales
     ├─────────────────────────────┤
@@ -16,225 +17,222 @@ Complementa el patrón AAA con la **pirámide de tests** del equipo.
     ├─────────────────────────────┤
     │  Unit (muchos)              │  Services, repositories, security
     └─────────────────────────────┘
+```
 
-Regla práctica:
-  - La mayor parte de la cobertura vive en **unitarios**.
-  - Los tests HTTP (`tests/api`) son **smoke** del contrato, no reescriben
-    toda la lógica del service.
-  - Los E2E solo cubren caminos de negocio críticos y están **apagados**
-    por defecto (hay que activarlos con variables de entorno).
+Reglas:
 
-Por qué:
-  - Unitarios son rápidos, estables y baratos de mantener.
-  - Demasiados E2E vuelven el CI frágil y lento.
-  - Si una regla de negocio falla, el unitario del service la señala primero.
+- La mayor parte de la cobertura vive en **unitarios**.
+- `tests/api` son **smoke** del contrato HTTP, no reescriben toda la lógica.
+- Los E2E están **apagados** por defecto (`RUN_E2E=1` para activarlos).
 
----------------------------------------------------------------------------
-2. Patrón AAA (Arrange – Act – Assert)
----------------------------------------------------------------------------
+Por qué: unitarios rápidos y estables; demasiados E2E vuelven el CI frágil.
 
-Cada test se lee como una mini-historia en tres bloques:
+---
 
-1. Arrange — preparas datos, fixtures, usuario, payloads.
-2. Act     — ejecutas UNA acción (llamar service, repo o un request).
-3. Assert  — verificas status, valores, excepciones.
+## 2. Patrón AAA (Arrange – Act – Assert)
 
-Ejemplo unitario (service)::
+1. **Arrange** — datos, fixtures, payloads  
+2. **Act** — una acción (service, repo o un request)  
+3. **Assert** — status, valores, excepciones  
 
-    def test_create_rejects_foreign_account(db_session):
-        # Arrange
-        owner = make_user(db_session, correo="a@x.com", usuario="owner")
-        other = make_user(db_session, correo="b@x.com", usuario="other")
-        ...
-        # Act / Assert
-        with pytest.raises(HTTPException) as exc:
-            TransactionService.create(db_session, owner, data)
-        assert exc.value.status_code == 404
+Ejemplo:
 
-Evita tests que hacen muchas acciones seguidas sin aserciones intermedias
-(salvo smokes de integración deliberadamente cortos).
+```python
+def test_create_rejects_foreign_account(db_session):
+    # Arrange
+    owner = make_user(db_session, correo="a@x.com", usuario="owner")
+    ...
+    # Act / Assert
+    with pytest.raises(HTTPException) as exc:
+        TransactionService.create(db_session, owner, data)
+    assert exc.value.status_code == 404
+```
 
----------------------------------------------------------------------------
-3. Mapa de carpetas
----------------------------------------------------------------------------
+---
 
-  tests/
-  ├── conftest.py              Fixtures globales (db_session, client, auth)
-  ├── helpers.py               Factories (make_user, make_account, …)
-  ├── core/                    UNIT — security, utilidades sin BD HTTP
-  ├── services/                UNIT — reglas de negocio (prioridad alta)
-  ├── repositories/            UNIT — consultas SQLAlchemy / ownership
-  ├── api/                     INTEGRATION — TestClient + SQLite en memoria
-  ├── integration/             INTEGRATION — Postgres real (opt-in)
-  └── e2e/                     E2E — HTTP contra servidor vivo (opt-in)
+## 3. Mapa de carpetas
 
-Markers (pyproject.toml)::
+```
+tests/
+├── conftest.py              Fixtures (db_session, client, auth, admin+MFA)
+├── helpers.py               Factories make_*
+├── core/                    UNIT — security
+├── services/                UNIT — negocio (+ MFA, transfer, reports, seed)
+├── repositories/            UNIT — queries / ownership
+├── api/                     INTEGRATION — TestClient + SQLite
+├── integration/             INTEGRATION — Postgres opt-in
+└── e2e/                     E2E — servidor vivo opt-in
+```
 
-  @pytest.mark.unit
-  @pytest.mark.integration
-  @pytest.mark.e2e
+Markers (`pyproject.toml`): `unit` | `integration` | `e2e`.
 
-Cada módulo de tests declara ``pytestmark = pytest.mark.<capa>``.
+Cada módulo declara `pytestmark = pytest.mark.<capa>`.
 
----------------------------------------------------------------------------
-4. Fixtures y factories
----------------------------------------------------------------------------
+---
 
-``db_session``
-  Motor SQLite en memoria, tablas creadas/destruídas por test.
-  Sirve para unitarios de service/repository y para API (vía override).
+## 4. Fixtures importantes
 
-``client``
-  ``TestClient`` de FastAPI con ``get_db`` sobreescrito a ``db_session``.
-  No necesita Docker ni Postgres.
+| Fixture | Qué hace |
+|---------|----------|
+| `db_session` | SQLite en memoria; tablas create/drop por test |
+| `client` | `TestClient` con `get_db` → `db_session` |
+| `registered_user` | Usuario vía `POST /auth/register` |
+| `auth_headers` | Bearer tras login |
+| `admin_headers` | Mismo user promovido a **admin con MFA activo** (requisito de catálogo) |
+| `_reset_rate_limiter` | Autouse: limpia el rate limit in-memory entre tests |
 
-``registered_user`` / ``auth_headers``
-  Arrange de flujos autenticados en ``tests/api``.
+Factories en `tests/helpers.py`: `make_user`, `make_account`, `make_category`, `make_sub_category`, `make_transaction`.
 
-``tests/helpers.py``
-  ``make_user``, ``make_account``, ``make_category``, ``make_sub_category``,
-  ``make_transaction`` — crean filas sin HTTP. Preferirlas en unitarios.
+Reglas:
 
-Importante:
-  - Los unitarios de service NO deben depender de endpoints.
-  - Los smokes de API NO deben duplicar todas las ramas del service
-    (mismatched subcategory, 409 de nombre, etc. → van en services/).
+- Unitarios de service **no** dependen de endpoints.
+- Smokes de API **no** duplican todas las ramas del service.
 
----------------------------------------------------------------------------
-5. Qué testear en cada capa
----------------------------------------------------------------------------
+---
 
-UNIT — services (prioridad #1)
-  - Ownership (cuenta / transacción solo del usuario del “JWT” simulado).
-  - Validaciones de negocio (subcategoría ∈ categoría).
-  - Conflictos 409, not found 404, forbidden 403.
-  - Efectos de update/delete sobre la sesión.
+## 5. Qué testear en cada capa
 
-UNIT — repositories
-  - Filtros por user_id / joins (Transaction ↔ Account).
-  - Lookups por correo/usuario.
-  - Ordenamientos básicos.
+**UNIT — services (prioridad #1)**
 
-UNIT — core
-  - bcrypt (hash ≠ plaintext, verify ok/fail).
-  - JWT create/decode/expiry.
+- Ownership  
+- Coherencia categoría/subcategoría  
+- Saldo (create/update/deactivate/transfer)  
+- Soft-delete  
+- MFA challenge / admin sin MFA bloqueado  
+- Reportes (gastos vs transferencias)
 
-INTEGRATION — api/
-  - Status codes del contrato público.
-  - Auth requerida (401 sin Bearer).
-  - Un happy-path CRUD corto por recurso nuevo.
+**UNIT — repositories**
 
-INTEGRATION — integration/ (opt-in)
-  - Conectividad Postgres + presencia de ``alembic_version``.
-  - Ampliar solo si hay bugs de dialecto SQLite vs Postgres.
+- Filtros `user_id`, `only_active`, joins Transaction↔Account  
 
-E2E — e2e/ (opt-in)
-  - Un camino crítico: health → register → login → account →
-    category/sub → transaction.
-  - No agregues E2E por cada endpoint.
+**UNIT — core**
 
----------------------------------------------------------------------------
-6. Cómo ejecutar
----------------------------------------------------------------------------
+- bcrypt, JWT, (opcional) firma webhook  
 
-Suite diaria (unit + API smoke; Postgres/E2E se auto-omiten)::
+**INTEGRATION — api/**
 
-    source .venv/bin/activate
-    pytest -q
+- Status codes del contrato  
+- 401 sin Bearer  
+- Happy-path corto por recurso  
 
-Solo unitarios::
+**INTEGRATION — integration/** (opt-in)
 
-    pytest -m unit -q
+- Postgres real + `alembic_version`  
 
-Solo integración API (y smoke Postgres si RUN_INTEGRATION=1)::
+**E2E** (opt-in)
 
-    pytest -m integration -q
+- Un camino crítico: health → register → login → account → catálogo → tx → report  
 
-Postgres real::
+---
 
-    docker compose up db -d
-    ./scripts/migrate.sh
-    RUN_INTEGRATION=1 \\
-      TEST_DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5432/app_db" \\
-      pytest -m integration -q tests/integration
+## 6. Cómo ejecutar
 
-E2E (API + DB ya levantados, p. ej. ``docker compose up``)::
+Suite diaria (CI-like):
 
-    RUN_E2E=1 E2E_BASE_URL=http://localhost:8000 pytest -m e2e -q
+```bash
+source .venv/bin/activate
+pytest -q -m "not e2e"
+# con coverage (como CI):
+pytest -q -m "not e2e" --cov=app --cov-fail-under=70
+```
 
-Verbose / un archivo::
+Solo unitarios:
 
-    pytest tests/services/test_transaction.py -v
+```bash
+pytest -m unit -q
+```
 
----------------------------------------------------------------------------
-7. Política al agregar código nuevo
----------------------------------------------------------------------------
+Postgres real:
 
-Cuando agregues un endpoint o regla:
+```bash
+docker compose up db -d
+./scripts/migrate.sh
+RUN_INTEGRATION=1 \
+  TEST_DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5432/app_db" \
+  pytest -m integration -q tests/integration
+```
 
-1. Escribe primero (o junto) **unitarios del service** para la regla nueva.
-2. Si tocas SQL no trivial, añade unitario de **repository**.
-3. Añade **como máximo un smoke** en ``tests/api`` si el contrato HTTP es nuevo.
-4. No abras un E2E nuevo salvo camino de producto crítico acordado con QA.
-5. Documenta el caso especial aquí o en ``docs/HOJA_RUTA.md`` si cambia la
-   estrategia.
+E2E (API ya arriba):
 
-Checklist PR (QA / Kevin)::
+```bash
+RUN_E2E=1 E2E_BASE_URL=http://localhost:8000 pytest -m e2e -q
+```
 
-  [ ] ``pytest -q`` en verde
-  [ ] Nuevas reglas de negocio cubiertas en ``tests/services``
-  [ ] Sin secretos en fixtures
-  [ ] Markers correctos (unit / integration / e2e)
+Lint:
 
----------------------------------------------------------------------------
-8. Qué NO hacer
----------------------------------------------------------------------------
+```bash
+ruff check app tests
+```
 
-  - No uses la BD de producción en tests.
-  - No dependas del orden de ejecución entre archivos.
-  - No mocks excesivos del ORM si un SQLite en memoria basta (más realista).
-  - No copies el mismo assert en service + API + E2E (pirámide, no triplicar).
-  - No desactives markers para “hacer pasar” el CI: arregla la causa.
+Auditoría de deps:
 
----------------------------------------------------------------------------
-9. Relación con otras docs
----------------------------------------------------------------------------
+```bash
+pip-audit -r requirements.txt -r requirements-dev.txt
+```
 
-  - ``docs/HOJA_RUTA.md`` — qué se implementó por pasos (incluye testing).
-  - ``docs/SEGURIDAD.md`` — JWT / bcrypt (cubierto en tests/core).
-  - ``docs/REPOSITORIOS.md`` — contrato de acceso a datos.
-  - ``docs/MODELOS.md`` — tablas y FK (contexto para factories).
-  - ``README.md`` — comandos rápidos ``pytest`` / markers.
+---
 
----------------------------------------------------------------------------
-10. Inventario actual (orientativo)
----------------------------------------------------------------------------
+## 7. Política al agregar código
 
-  Unit:
-    tests/core/test_security.py
-    tests/services/test_*_service.py      (account, category, sub_category,
-                                           transaction, user)
-    tests/services/test_seed_catalog.py
-    tests/repositories/test_*_repository.py
-                                          (account, category, transaction, user)
+1. Unitarios del **service** para la regla nueva.  
+2. Si el SQL no es trivial → unitario de **repository**.  
+3. Como máximo **un smoke** en `tests/api` si el contrato HTTP es nuevo.  
+4. No abras E2E nuevos salvo camino crítico acordado con QA.  
+5. Actualiza el inventario de abajo y [API.md](API.md) / [NEGOCIO.md](NEGOCIO.md) si cambia comportamiento.
 
-  Integration:
-    tests/api/test_health.py
-    tests/api/test_auth.py
-    tests/api/test_accounts.py
-    tests/api/test_categories.py
-    tests/api/test_transactions.py
-    tests/integration/test_postgres_smoke.py   (opt-in)
+Checklist PR:
 
-  E2E:
-    tests/e2e/test_critical_path.py            (opt-in)
+- [ ] `pytest -q -m "not e2e"` en verde  
+- [ ] Nuevas reglas en `tests/services`  
+- [ ] Sin secretos reales en fixtures  
+- [ ] Markers correctos  
+- [ ] Docs alineadas si cambió el contrato  
 
-CI:
-  .github/workflows/ci.yml — ruff + pytest -m "not e2e"
+---
 
-Nota: los basenames deben ser únicos entre carpetas
-(``test_account_service.py`` vs ``test_account_repository.py``) para evitar
-errores de collection de pytest.
+## 8. Qué NO hacer
+
+- No uses BD de producción.  
+- No dependas del orden entre archivos.  
+- No tripliques el mismo assert en service + API + E2E.  
+- No desactives markers para “hacer pasar” el CI.  
+- No olvides limpiar rate limit si agregas tests de auth masivos (ya hay autouse).  
+
+---
+
+## 9. Inventario actual
+
+**Unit**
+
+- `tests/core/test_security.py`
+- `tests/services/test_account_service.py`
+- `tests/services/test_category_service.py`
+- `tests/services/test_sub_category_service.py`
+- `tests/services/test_transaction_service.py`
+- `tests/services/test_transfer_service.py`
+- `tests/services/test_user_service.py`
+- `tests/services/test_report_service.py`
+- `tests/services/test_seed_catalog.py`
+- `tests/services/test_security_controls.py` (MFA, webhooks, admin sin MFA)
+- `tests/repositories/test_*_repository.py`
+
+**Integration**
+
+- `tests/api/test_health.py`
+- `tests/api/test_auth.py`
+- `tests/api/test_accounts.py`
+- `tests/api/test_categories.py`
+- `tests/api/test_transactions.py`
+- `tests/integration/test_postgres_smoke.py` (opt-in)
+
+**E2E**
+
+- `tests/e2e/test_critical_path.py` (opt-in)
+
+**CI** (`.github/workflows/ci.yml`)
+
+1. Ruff  
+2. pip-audit  
+3. Pytest `-m "not e2e"` con coverage ≥ 70%  
 
 Actualiza este inventario cuando agregues módulos relevantes.
-"""

@@ -1,8 +1,5 @@
 """
 Modelo User → tabla `users`.
-
-No se elimina la cuenta de acceso: se desactiva (`activo=False`).
-Las cuentas financieras del usuario tampoco se borran en cascada.
 """
 
 from __future__ import annotations
@@ -10,7 +7,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, String, func
+from sqlalchemy import Boolean, Date, DateTime, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -36,6 +33,10 @@ class User(Base):
     rol: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    # MFA TOTP (obligatorio para operar como admin).
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    mfa_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -55,5 +56,5 @@ class User(Base):
     def __repr__(self) -> str:
         return (
             f"User(id={self.id}, usuario={self.usuario!r}, "
-            f"rol={self.rol!r}, activo={self.activo})"
+            f"rol={self.rol!r}, activo={self.activo}, mfa={self.mfa_enabled})"
         )

@@ -27,6 +27,7 @@ class UserPublic(BaseModel):
     usuario: str
     rol: str = "user"
     activo: bool = True
+    mfa_enabled: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -35,6 +36,33 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    mfa_required: bool = False
+    mfa_token: str | None = None
+
+
+class LoginResponse(BaseModel):
+    """Login puede devolver tokens o un challenge MFA."""
+
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_type: str = "bearer"
+    mfa_required: bool = False
+    mfa_token: str | None = None
+
+
+class MfaVerifyRequest(BaseModel):
+    mfa_token: str = Field(min_length=20)
+    code: str = Field(min_length=6, max_length=8, pattern=r"^\d{6,8}$")
+
+
+class MfaSetupResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
+    mfa_enabled: bool
+
+
+class MfaConfirmRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=8, pattern=r"^\d{6,8}$")
 
 
 class RefreshRequest(BaseModel):
