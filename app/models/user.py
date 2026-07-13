@@ -14,6 +14,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.account import Account
+    from app.models.counterparty import Counterparty
     from app.models.refresh_token import RefreshToken
 
 
@@ -44,6 +45,7 @@ class User(Base):
     )
 
     accounts: Mapped[list[Account]] = relationship(back_populates="user")
+    counterparties: Mapped[list[Counterparty]] = relationship(back_populates="user")
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",

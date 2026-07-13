@@ -23,19 +23,24 @@ Reglas de producto: [NEGOCIO.md](NEGOCIO.md).
 
 ```
 users 1 ──────────── N accounts 1 ──────────── N transactions
-  │                                              │    │
-  │                                              │    │
-  └──── N refresh_tokens                         │    │
-                                                 │    │
-categories 1 ──── N sub_categories ──────────────┘    │
-     │                                                │
-     └──────────────── N transactions ────────────────┘
+  │                      │                          │    │    │
+  │                      │ (incluye wallet          │    │    │
+  │                      │  tipo=efectivo)          │    │    │
+  │                      │                          │    │    │
+  ├──── N counterparties ───────────────────────────┘    │    │
+  │                                                      │    │
+  └──── N refresh_tokens                                 │    │
+                                                         │    │
+categories 1 ──── N sub_categories ──────────────────────┘    │
+     │                                                        │
+     └──────────────── N transactions ────────────────────────┘
 ```
 
 Una `Transaction` apunta siempre a:
 
-- 1 `Account` (de quién es el dinero),
-- 1 `Category` + 1 `SubCategory` (clasificación; el service valida coherencia).
+- 1 `Account` (de quién es el dinero; si `medio_pago=efectivo`, es el wallet auto-gestionado),
+- 1 `Category` + 1 `SubCategory` (clasificación; el service valida coherencia),
+- 0..1 `Counterparty` (tercero opcional fuera del sistema).
 
 ---
 
@@ -91,15 +96,32 @@ Cuenta financiera del usuario.
 | `id` | int PK | |
 | `user_id` | FK → users | Dueño |
 | `banco` | varchar(100) | Nombre visible |
-| `tipo` | varchar(100) | ahorros, corriente, digital… |
+| `tipo` | varchar(100) | ahorros, corriente, digital, **efectivo** (wallet auto)… |
 | `moneda` | varchar(10) | COP, USD… |
 | `saldo` | Numeric(14,2) | Solo cambia por movimientos (+ saldo_inicial al crear) |
 | `activo` | bool | Soft-delete |
 | `creado_en`, `actualizado_en` | timestamptz | |
 
+Wallet de efectivo: el service lo crea con `banco="Efectivo"`, `tipo="efectivo"`, uno por usuario+moneda (`AccountRepository.get_or_create_cash_wallet`).
+
 **Importante:** la relación `transactions` **no** usa `delete-orphan`. Desactivar la cuenta no borra el historial.
 
-### 3.4 `categories`
+### 3.4 `counterparties`
+
+Agenda de terceros (cuentas/personas **fuera** del sistema).
+
+| Columna | Tipo | Notas |
+|---------|------|-------|
+| `id` | int PK | |
+| `user_id` | FK → users | Dueño |
+| `nombre` | varchar(150) | Obligatorio |
+| `banco` | varchar(100) nullable | Banco ajeno (opcional) |
+| `numero_cuenta` | varchar(100) nullable | Cuenta no registrada (opcional) |
+| `notas` | text nullable | |
+| `activo` | bool | Soft-delete |
+| `creado_en`, `actualizado_en` | timestamptz | |
+
+### 3.5 `categories`
 
 Catálogo global (compartido entre usuarios).
 
@@ -113,7 +135,7 @@ Catálogo global (compartido entre usuarios).
 
 Al desactivar: el service también desactiva subcategorías hijas.
 
-### 3.5 `sub_categories`
+### 3.6 `sub_categories`
 
 | Columna | Tipo | Notas |
 |---------|------|-------|
@@ -123,18 +145,20 @@ Al desactivar: el service también desactiva subcategorías hijas.
 | `activo` | bool | |
 | `creado_en`, `actualizado_en` | timestamptz | |
 
-### 3.6 `transactions`
+### 3.7 `transactions`
 
 Movimiento de dinero (ledger).
 
 | Columna | Tipo | Notas |
 |---------|------|-------|
 | `id` | int PK | |
-| `account_id` | FK → accounts | |
+| `account_id` | FK → accounts | Siempre presente (wallet si efectivo) |
 | `category_id` | FK → categories | |
 | `sub_category_id` | FK → sub_categories | Debe pertenecer a `category_id` |
+| `contraparte_id` | FK → counterparties nullable | Tercero opcional |
 | `monto` | Numeric(14,2) | Siempre > 0 en API |
 | `tipo` | varchar(30) | ver abajo |
+| `medio_pago` | varchar(20) | `cuenta` \| `efectivo` |
 | `fecha` | date | Fecha contable |
 | `descripcion` | varchar | |
 | `activo` | bool | Soft-delete |
@@ -147,6 +171,11 @@ Valores de `tipo`:
 - `ingreso`
 - `transferencia_salida`
 - `transferencia_entrada`
+
+Valores de `medio_pago`:
+
+- `cuenta` — requiere `account_id` en la API
+- `efectivo` — requiere `moneda` en la API; el service asigna el wallet
 
 ---
 
@@ -168,7 +197,7 @@ Reportes solo suman filas con `activo=true`.
 
 ## 5. Migraciones (historial Alembic)
 
-Head actual: `d4e5f6a7b8c9`.
+Head actual: `e5f6a7b8c9d0`.
 
 | Revisión | Qué aporta |
 |----------|------------|
@@ -177,6 +206,7 @@ Head actual: `d4e5f6a7b8c9`.
 | `b2c3d4e5f6a7` | `users.rol` + tabla `refresh_tokens` |
 | `c3d4e5f6a7b8` | `activo` en entidades + `grupo_transferencia` |
 | `d4e5f6a7b8c9` | `mfa_enabled` + `mfa_secret_encrypted` |
+| `e5f6a7b8c9d0` | `counterparties` + `medio_pago` / `contraparte_id` en txs |
 
 Aplicar:
 
@@ -215,6 +245,7 @@ Catálogo en `app/services/seed.py` (idempotente), incluye entre otras:
 app/models/user.py
 app/models/refresh_token.py
 app/models/account.py
+app/models/counterparty.py
 app/models/category.py
 app/models/sub_category.py
 app/models/transaction.py

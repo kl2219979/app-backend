@@ -227,3 +227,19 @@
 #   docs/TESTING.md
 #   README.md
 #
+# ---------------------------------------------------------------------------
+# Paso 13 — Contrapartes externas + medio de pago efectivo
+# ---------------------------------------------------------------------------
+# Contrapartes (`counterparties`): agenda de terceros fuera del sistema.
+#   CRUD JWT + soft-delete/reactivate; ownership por user_id.
+#   Transaction.contraparte_id opcional en gasto/ingreso.
+#
+# Medio de pago:
+#   medio_pago = cuenta | efectivo
+#   efectivo → moneda obligatoria, sin account_id; wallet auto
+#   (banco="Efectivo", tipo="efectivo") por usuario+moneda.
+#   Banco↔efectivo vía POST /transactions/transfers.
+#
+# Migración: e5f6a7b8c9d0
+# Docs: NEGOCIO, MODELOS, API, este archivo.
+#

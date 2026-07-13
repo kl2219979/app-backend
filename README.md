@@ -201,9 +201,10 @@ Prefijo: `/api/v1`
 |------|----------|
 | Auth | register, login, MFA, refresh, logout, me |
 | Users | perfil propio (GET/PUT/DELETE = desactivar) |
-| Accounts | CRUD + reactivate; create con `saldo_inicial` |
+| Accounts | CRUD + reactivate; create con `saldo_inicial`; wallet efectivo auto |
+| Counterparties | CRUD + reactivate; terceros fuera del sistema |
 | Categories / Subcategories | lectura JWT; escritura **admin+MFA** |
-| Transactions | CRUD + `POST /transactions/transfers` |
+| Transactions | CRUD + transfers; `medio_pago` cuenta/efectivo; `contraparte_id` |
 | Reports | `GET /reports/summary` |
 | Webhooks | `POST /webhooks/inbound` (HMAC) |
 

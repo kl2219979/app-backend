@@ -5,6 +5,10 @@ tipos:
   gasto / ingreso                 → movimientos operativos
   transferencia_salida / _entrada → piernas de una transferencia (mismo grupo_transferencia)
 
+medio_pago:
+  cuenta   → account_id de una cuenta propia (banco/billetera)
+  efectivo → account_id del wallet interno auto-gestionado (tipo=efectivo)
+
 No se borran: se desactivan (`activo=False`) y se revierte el impacto en saldo.
 """
 
@@ -22,6 +26,7 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.models.account import Account
     from app.models.category import Category
+    from app.models.counterparty import Counterparty
     from app.models.sub_category import SubCategory
 
 
@@ -45,9 +50,15 @@ class Transaction(Base):
         nullable=False,
         index=True,
     )
+    contraparte_id: Mapped[int | None] = mapped_column(
+        ForeignKey("counterparties.id"),
+        nullable=True,
+        index=True,
+    )
 
     monto: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     tipo: Mapped[str] = mapped_column(String(30), nullable=False, default="gasto")
+    medio_pago: Mapped[str] = mapped_column(String(20), nullable=False, default="cuenta")
     fecha: Mapped[date] = mapped_column(Date, nullable=False)
     descripcion: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -69,6 +80,7 @@ class Transaction(Base):
     account: Mapped[Account] = relationship(back_populates="transactions")
     category: Mapped[Category] = relationship(back_populates="transactions")
     sub_category: Mapped[SubCategory] = relationship(back_populates="transactions")
+    counterparty: Mapped[Counterparty | None] = relationship(back_populates="transactions")
 
     def __repr__(self) -> str:
         return (

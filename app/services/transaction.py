@@ -6,6 +6,8 @@ Principios:
 - No se borran movimientos: se desactivan y se revierte el impacto.
 - Transferencias = dos piernas vinculadas (salida + entrada).
 - Solo se opera sobre cuentas/categorías activas.
+- medio_pago=efectivo resuelve wallet interno (tipo=efectivo) por moneda.
+- contraparte_id opcional documenta terceros fuera del sistema.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.repositories.account import AccountRepository
 from app.repositories.category import CategoryRepository
+from app.repositories.counterparty import CounterpartyRepository
 from app.repositories.sub_category import SubCategoryRepository
 from app.repositories.transaction import TransactionRepository
 from app.schemas.pagination import Page
@@ -87,6 +90,54 @@ class TransactionService:
         return account
 
     @staticmethod
+    def _ensure_own_active_counterparty(
+        db: Session, user: User, contraparte_id: int | None
+    ) -> None:
+        if contraparte_id is None:
+            return
+        item = CounterpartyRepository.get_by_id_for_user(
+            db,
+            counterparty_id=contraparte_id,
+            user_id=user.id,
+            only_active=True,
+        )
+        if item is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Contraparte no encontrada o inactiva",
+            )
+
+    @staticmethod
+    def _resolve_account_for_medio(
+        db: Session,
+        user: User,
+        *,
+        medio_pago: str,
+        account_id: int | None,
+        moneda: str | None,
+    ) -> Account:
+        if medio_pago == "efectivo":
+            if account_id is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No envíes account_id cuando medio_pago=efectivo; usa moneda",
+                )
+            if not moneda:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="moneda es obligatoria cuando medio_pago=efectivo",
+                )
+            return AccountRepository.get_or_create_cash_wallet(
+                db, user_id=user.id, moneda=moneda
+            )
+        if account_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="account_id es obligatorio cuando medio_pago=cuenta",
+            )
+        return TransactionService._get_own_active_account(db, user, account_id)
+
+    @staticmethod
     def list_mine(
         db: Session,
         current_user: User,
@@ -141,16 +192,25 @@ class TransactionService:
 
     @staticmethod
     def create(db: Session, current_user: User, data: TransactionCreate) -> Transaction:
-        account = TransactionService._get_own_active_account(
-            db, current_user, data.account_id
+        account = TransactionService._resolve_account_for_medio(
+            db,
+            current_user,
+            medio_pago=data.medio_pago,
+            account_id=data.account_id,
+            moneda=data.moneda,
         )
         TransactionService._ensure_category_pair(db, data.category_id, data.sub_category_id)
+        TransactionService._ensure_own_active_counterparty(
+            db, current_user, data.contraparte_id
+        )
         item = Transaction(
-            account_id=data.account_id,
+            account_id=account.id,
             category_id=data.category_id,
             sub_category_id=data.sub_category_id,
+            contraparte_id=data.contraparte_id,
             monto=data.monto,
             tipo=data.tipo,
+            medio_pago=data.medio_pago,
             fecha=data.fecha,
             descripcion=data.descripcion,
             activo=True,
@@ -183,27 +243,71 @@ class TransactionService:
             )
 
         payload = data.model_dump(exclude_unset=True)
-        account_id = payload.get("account_id", item.account_id)
-        category_id = payload.get("category_id", item.category_id)
-        sub_category_id = payload.get("sub_category_id", item.sub_category_id)
+        medio_pago = payload.get("medio_pago", item.medio_pago)
         new_tipo = payload.get("tipo", item.tipo)
         new_monto = payload.get("monto", item.monto)
+        category_id = payload.get("category_id", item.category_id)
+        sub_category_id = payload.get("sub_category_id", item.sub_category_id)
+        contraparte_id = payload.get("contraparte_id", item.contraparte_id)
+
+        account_id_in_payload = "account_id" in payload
+        moneda_in_payload = "moneda" in payload
+        account_id = payload.get("account_id")
+        moneda = payload.get("moneda")
+
+        if medio_pago == "efectivo":
+            if account_id_in_payload and account_id is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No envíes account_id cuando medio_pago=efectivo; usa moneda",
+                )
+            if item.medio_pago != "efectivo" and not moneda_in_payload:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="moneda es obligatoria al cambiar a medio_pago=efectivo",
+                )
+            if not moneda_in_payload and item.medio_pago == "efectivo":
+                # Same cash account; keep using current account unless moneda provided.
+                new_account = TransactionService._get_own_active_account(
+                    db, current_user, item.account_id
+                )
+            else:
+                new_account = AccountRepository.get_or_create_cash_wallet(
+                    db, user_id=current_user.id, moneda=moneda  # type: ignore[arg-type]
+                )
+        else:
+            resolved_account_id = (
+                account_id if account_id_in_payload else item.account_id
+            )
+            if resolved_account_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="account_id es obligatorio cuando medio_pago=cuenta",
+                )
+            new_account = TransactionService._get_own_active_account(
+                db, current_user, resolved_account_id
+            )
 
         old_account = TransactionService._get_own_active_account(
             db, current_user, item.account_id
         )
-        new_account = TransactionService._get_own_active_account(
-            db, current_user, account_id
-        )
         TransactionService._ensure_category_pair(db, category_id, sub_category_id)
+        TransactionService._ensure_own_active_counterparty(
+            db, current_user, contraparte_id
+        )
         _ = TransactionService._delta(new_tipo, new_monto)
 
         TransactionService._apply_saldo(
             old_account,
             -TransactionService._delta(item.tipo, item.monto),
         )
+        # moneda is request-only; never persist on Transaction.
+        payload.pop("moneda", None)
         for key, value in payload.items():
             setattr(item, key, value)
+        item.account_id = new_account.id
+        item.medio_pago = medio_pago
+        item.contraparte_id = contraparte_id
         TransactionRepository.update(db, item)
         TransactionService._apply_saldo(
             new_account,
@@ -286,6 +390,7 @@ class TransactionService:
             sub_category_id=data.sub_category_id,
             monto=data.monto,
             tipo="transferencia_salida",
+            medio_pago="cuenta",
             fecha=data.fecha,
             descripcion=f"{desc_out} (salida)",
             activo=True,
@@ -297,6 +402,7 @@ class TransactionService:
             sub_category_id=data.sub_category_id,
             monto=data.monto,
             tipo="transferencia_entrada",
+            medio_pago="cuenta",
             fecha=data.fecha,
             descripcion=f"{desc_out} (entrada)",
             activo=True,

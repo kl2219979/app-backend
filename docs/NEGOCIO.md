@@ -67,6 +67,7 @@ Por eso casi todo DELETE HTTP significa: `activo = false`.
 |---------|-------------|-----------|-------|
 | Usuario | `activo=false` + revoca refresh | Cuentas/txs se conservan | Intactos |
 | Cuenta | `activo=false` | Movimientos se conservan | **No se toca** |
+| Contraparte | `activo=false` | Txs antiguas conservan el FK | — |
 | Categoría | `activo=false` + desactiva subcategorías hijas | Txs antiguas se conservan | — |
 | Subcategoría | `activo=false` | Idem | — |
 | Transacción | `activo=false` | Fila permanece | **Se revierte** el impacto |
@@ -93,12 +94,35 @@ Por defecto los listados muestran solo `activo=true`.
 | Recurso | Regla |
 |---------|-------|
 | Accounts | Solo las del `user_id` del JWT |
+| Counterparties | Solo las del `user_id` del JWT |
 | Transactions | Solo las de cuentas propias |
 | Reports | Solo agrega datos del usuario autenticado |
 | Users `/{id}` | Solo el propio `id` |
 | Categories / Subcategories | Catálogo **global** (lectura cualquier JWT; escritura admin+MFA) |
 
-Intentar operar la cuenta de otro → 404 (no revelamos existencia).
+Intentar operar la cuenta/contraparte de otro → 404 (no revelamos existencia).
+
+---
+
+## 4.1 Contrapartes (terceros fuera del sistema)
+
+Agenda personal de destinatarios/origenes que **no** son cuentas propias:
+
+- Campos: `nombre` (obligatorio), `banco`, `numero_cuenta`, `notas` (opcionales).
+- Un gasto/ingreso puede llevar `contraparte_id` para documentar a quién se pagó / de quién se recibió.
+- No mueve saldo de nadie más: el dinero entra/sale de **tu** cuenta o wallet de efectivo.
+- Soft-delete: no se pueden usar contrapartes inactivas en txs nuevas; el historial conserva el FK.
+
+---
+
+## 4.2 Medio de pago (`cuenta` | `efectivo`)
+
+| `medio_pago` | Qué envía el client | Qué hace el backend |
+|--------------|---------------------|---------------------|
+| `cuenta` | `account_id` obligatorio | Usa esa cuenta propia activa |
+| `efectivo` | `moneda` obligatoria; **sin** `account_id` | Resuelve/crea wallet `tipo=efectivo`, `banco=Efectivo` por usuario+moneda |
+
+El wallet aparece en `GET /accounts` y cuenta para saldos/reportes. Banco↔efectivo se hace con `POST /transactions/transfers` hacia/desde ese wallet.
 
 ---
 
@@ -172,10 +196,12 @@ Query: `limit` (1–100, default 20), `offset` (default 0).
 1. Tras login, guardar `access_token` y `refresh_token`.
 2. Si `mfa_required`, ir a pantalla TOTP → `/auth/mfa/verify`.
 3. Crear cuenta con `saldo_inicial`, nunca editar `saldo` después.
-4. Gastos/ingresos con `tipo` correcto; transferencias por `/transactions/transfers`.
-5. DELETE = “archivar”; ofrecer reactivar cuentas si aplica.
-6. Dashboard: usar `/reports/summary`, no recalcular a ciegas sumando transferencias como gastos.
-7. Escritura de categorías: solo si el usuario es admin **con MFA**.
+4. Gastos/ingresos con `tipo` y `medio_pago` correctos; efectivo usa `moneda` (sin `account_id`).
+5. Terceros externos: CRUD `/counterparties` + `contraparte_id` opcional en el movimiento.
+6. Transferencias por `/transactions/transfers` (incluye banco↔wallet efectivo).
+7. DELETE = “archivar”; ofrecer reactivar cuentas/contrapartes si aplica.
+8. Dashboard: usar `/reports/summary`, no recalcular a ciegas sumando transferencias como gastos.
+9. Escritura de categorías: solo si el usuario es admin **con MFA**.
 
 Más detalle HTTP: [API.md](API.md).  
 Más detalle de tablas: [MODELOS.md](MODELOS.md).
