@@ -58,8 +58,10 @@ Login → Me
      → GET /categories + /subcategories
      → GET /accounts
      → GET /counterparties
-     → GET /reports/summary          ← Home / dashboard
-     → GET /transactions?…           ← Feed / extracto
+     → GET /budgets + /budgets/status   ← metas del mes
+     → GET /reports/summary            ← Home / dashboard
+     → GET /transactions?…             ← Feed / extracto
+     → GET /transactions/export?format=csv  ← descarga
 ```
 
 ### Dashboard — `GET /reports/summary`
@@ -78,6 +80,7 @@ Campos útiles para UI:
 | Serie temporal | `by_month[]` |
 | Bolsillos | `by_account[]` (`saldo` actual + totales del periodo) |
 | “Vs periodo anterior” | `period_comparison` |
+| Presupuestos del mes | `budgets_status[]` |
 
 `period_comparison`:
 
@@ -102,6 +105,14 @@ Filtros:
 | `medio_pago` | `cuenta` \| `efectivo` |
 | `tipo` | `gasto` \| `ingreso` \| `transferencia_*` |
 | `date_from` / `date_to` | periodo |
+
+Exportar el mismo set filtrado: `GET /transactions/export?format=csv|json` (máx. 10k filas).
+
+### Presupuestos — `/budgets`
+
+- Crear: `POST /budgets` con `category_id` + `limite` (periodo `mensual`).
+- Progreso: `GET /budgets/status` o el bloque `budgets_status` del summary.
+- Soft-delete / reactivate como el resto de entidades.
 
 ### Crear movimiento
 
@@ -133,10 +144,12 @@ Transferencias: `POST /transactions/transfers` entre dos cuentas propias (incluy
 ## 6. Checklist de integración
 
 - [ ] Login + persistencia de tokens + refresh  
-- [ ] Home con `/reports/summary` (KPI + mes + categorías)  
+- [ ] Home con `/reports/summary` (KPI + mes + categorías + presupuestos)  
 - [ ] Filtro de periodo y de cuenta  
 - [ ] Lista de cuentas con saldo (incl. Efectivo)  
 - [ ] Feed de transacciones con paginación  
+- [ ] Export CSV/JSON  
+- [ ] CRUD presupuestos / barra de consumo  
 - [ ] Alta gasto cuenta / efectivo / con contraparte  
 - [ ] Transferencia entre cuentas  
 - [ ] Manejo 400 fondos insuficientes y 401/429  

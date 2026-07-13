@@ -19,6 +19,7 @@ IMPORTANTE
 """
 
 from app.models.account import Account  # noqa: F401
+from app.models.budget import Budget  # noqa: F401
 from app.models.category import Category  # noqa: F401
 from app.models.counterparty import Counterparty  # noqa: F401
 from app.models.refresh_token import RefreshToken  # noqa: F401

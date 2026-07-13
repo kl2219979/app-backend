@@ -34,6 +34,7 @@ from app.schemas.report import (
     ReportSummary,
     SubCategoryBreakdown,
 )
+from app.services.budget import BudgetService
 
 
 def _pct_change(current: Decimal, previous: Decimal) -> Decimal | None:
@@ -407,6 +408,7 @@ class ReportService:
             by_counterparty=by_counterparty,
             by_month=by_month,
             by_account=by_account,
+            budgets_status=BudgetService.list_status(db, current_user),
             period_comparison=period_comparison,
             date_from=date_from,
             date_to=date_to,

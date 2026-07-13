@@ -64,9 +64,10 @@ tests/
 └── e2e/                     E2E — servidor vivo opt-in
 ```
 
-Markers (`pyproject.toml`): `unit` | `integration` | `e2e`.
+Markers (`pyproject.toml`): `unit` | `integration` | `postgres` | `e2e`.
 
 Cada módulo declara `pytestmark = pytest.mark.<capa>`.
+Los smoke de Postgres llevan también `pytest.mark.postgres` (`RUN_INTEGRATION=1`).
 
 ---
 
@@ -149,7 +150,7 @@ docker compose up db -d
 ./scripts/migrate.sh
 RUN_INTEGRATION=1 \
   TEST_DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5432/app_db" \
-  pytest -m integration -q tests/integration
+  pytest -m postgres -q tests/integration
 ```
 
 E2E (API ya arriba):

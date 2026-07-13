@@ -21,9 +21,43 @@ from app.schemas.transaction import (
     TransferCreate,
     TransferResponse,
 )
+from app.services.export import ExportService
 from app.services.transaction import TransactionService
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
+
+
+@router.get("/export")
+def export_transactions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    format: Literal["csv", "json"] = Query(default="csv"),
+    account_id: int | None = Query(default=None, gt=0),
+    category_id: int | None = Query(default=None, gt=0),
+    sub_category_id: int | None = Query(default=None, gt=0),
+    contraparte_id: int | None = Query(default=None, gt=0),
+    medio_pago: Literal["cuenta", "efectivo"] | None = Query(default=None),
+    tipo: Literal[
+        "gasto", "ingreso", "transferencia_salida", "transferencia_entrada"
+    ]
+    | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+):
+    """Descarga movimientos activos (máx. 10_000) en CSV o JSON."""
+    return ExportService.export_transactions(
+        db,
+        current_user,
+        fmt=format,
+        account_id=account_id,
+        category_id=category_id,
+        sub_category_id=sub_category_id,
+        contraparte_id=contraparte_id,
+        medio_pago=medio_pago,
+        tipo=tipo,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
 
 @router.get("", response_model=Page[TransactionResponse])

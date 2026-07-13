@@ -259,6 +259,13 @@ Soft-delete. **204**
 - **Orden estable:** `fecha DESC`, `id DESC` (más recientes primero)
 - Página: `{ items, total, limit, offset }`
 
+### `GET /transactions/export`
+
+- **Auth:** JWT  
+- Query: mismos filtros que el listado + `format=csv|json` (default `csv`)  
+- Descarga hasta **10_000** movimientos activos  
+- CSV: `Content-Disposition` attachment; JSON: lista de objetos
+
 ### `POST /transactions`
 
 Body (pago con cuenta propia):
@@ -338,6 +345,36 @@ Si es transferencia, desactiva ambas piernas.
 
 ---
 
+## budgets
+
+Presupuesto mensual por categoría (`(user_id, category_id)` único).
+
+### `GET /budgets`
+
+- **Auth:** JWT — página `{ items, total, limit, offset }` (activos)
+
+### `GET /budgets/status`
+
+- **Auth:** JWT  
+- Lista de presupuestos activos con `gastado`, `restante`, `pct_usado`, `excedido` (mes calendario actual)
+
+### `GET /budgets/{budget_id}` / `GET /budgets/{budget_id}/status`
+
+### `POST /budgets`
+
+Body: `{ "category_id": 2, "limite": "500000.00", "moneda": "COP", "periodo": "mensual" }`  
+Si ya existía uno inactivo para esa categoría, lo reactiva y actualiza el límite.
+
+### `PUT /budgets/{budget_id}`
+
+### `DELETE /budgets/{budget_id}`
+
+Soft-delete → **204**
+
+### `POST /budgets/{budget_id}/reactivate`
+
+---
+
 ## reports
 
 ### `GET /reports/summary`
@@ -359,6 +396,7 @@ Respuesta (campos):
 | `by_counterparty` | Top 10 terceros (gastos+ingresos con `contraparte_id`) |
 | `by_month` | Totales por año/mes |
 | `by_account` | Saldo actual + totales por cuenta |
+| `budgets_status` | Presupuestos activos vs gasto del mes calendario |
 | `period_comparison` | Periodo actual vs anterior (mismas longitudes o mes calendario) |
 | `date_from`, `date_to`, `account_id` | Eco de filtros |
 

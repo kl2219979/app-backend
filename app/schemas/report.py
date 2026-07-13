@@ -5,6 +5,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.budget import BudgetStatus
+
 
 class CategoryBreakdown(BaseModel):
     category_id: int
@@ -90,6 +92,7 @@ class ReportSummary(BaseModel):
     by_counterparty: list[CounterpartyBreakdown]
     by_month: list[MonthBucket]
     by_account: list[AccountSnapshot]
+    budgets_status: list[BudgetStatus]
     period_comparison: PeriodComparison
     date_from: date | None = None
     date_to: date | None = None

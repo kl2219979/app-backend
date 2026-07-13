@@ -2,11 +2,11 @@
 Integration — smoke opcional contra PostgreSQL real.
 
 No corre en el flujo diario (`pytest`). Solo con:
-  RUN_INTEGRATION=1 TEST_DATABASE_URL=postgresql+psycopg2://... pytest -m integration
+  RUN_INTEGRATION=1 TEST_DATABASE_URL=postgresql+psycopg2://... pytest -m postgres
 
 Requisitos:
   - Postgres accesible (p. ej. `docker compose up db -d`)
-  - Esquema aplicado (`./scripts/migrate.sh`)
+  - Esquema aplicado (`./scripts/migrate.sh` / `alembic upgrade head`)
   - Preferible una BD dedicada de test (no la de desarrollo con datos importantes)
 """
 
@@ -17,7 +17,7 @@ import os
 import pytest
 from sqlalchemy import create_engine, text
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.postgres]
 
 
 @pytest.fixture()

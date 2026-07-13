@@ -263,3 +263,13 @@
 #   orden documentado fecha DESC, id DESC.
 # Kit FE: docs/FRONTEND.md + Postman collection + scripts/export_openapi.py
 #
+# ---------------------------------------------------------------------------
+# Paso 16 — Prioridad media: presupuestos, export, CI Postgres
+# ---------------------------------------------------------------------------
+# Presupuestos (`budgets`): límite mensual por categoría (CRUD + soft-delete).
+#   GET /budgets/status + budgets_status en reports/summary (mes calendario).
+# Export: GET /transactions/export?format=csv|json (mismos filtros; máx 10k).
+# CI: servicio Postgres 16 + migrate + pytest unit/API + marker `postgres`.
+# Migración: a7b8c9d0e1f2
+#
+#

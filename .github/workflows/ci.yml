@@ -1,4 +1,4 @@
-# CI — lint + security audit + unit/API tests + coverage gate
+# CI — lint + security audit + unit/API tests + Postgres integration
 name: CI
 
 on:
@@ -9,8 +9,35 @@ on:
 
 jobs:
   test:
-    name: Ruff + pip-audit + Pytest
+    name: Ruff + pip-audit + Pytest (+ Postgres)
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d app_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app_ci
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      SECRET_KEY: ci-secret-key-change-me-please-32chars
+      WEBHOOK_SECRET: ci-webhook-secret-change-me-please-32c
+      APP_ENV: development
+      DEBUG: "true"
+      RUN_E2E: "0"
 
     steps:
       - name: Checkout
@@ -33,12 +60,20 @@ jobs:
       - name: pip-audit (vulnerable components)
         run: pip-audit -r requirements.txt -r requirements-dev.txt
 
-      - name: Pytest with coverage gate
+      - name: Apply Alembic migrations (Postgres)
+        run: alembic upgrade head
+
+      - name: Pytest with coverage gate (SQLite unit/API)
         run: >
-          pytest -q -m "not e2e"
+          pytest -q -m "not e2e and not postgres"
           --cov=app
           --cov-report=term-missing
           --cov-fail-under=70
         env:
           RUN_INTEGRATION: "0"
-          RUN_E2E: "0"
+
+      - name: Pytest Postgres schema checks
+        run: pytest -q -m postgres --tb=short
+        env:
+          RUN_INTEGRATION: "1"
+          TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/app_ci
