@@ -155,6 +155,9 @@ class TransactionService:
         *,
         account_id: int | None = None,
         category_id: int | None = None,
+        sub_category_id: int | None = None,
+        contraparte_id: int | None = None,
+        medio_pago: str | None = None,
         tipo: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
@@ -170,11 +173,23 @@ class TransactionService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Cuenta no encontrada",
                 )
+        if contraparte_id is not None:
+            cp = CounterpartyRepository.get_by_id_for_user(
+                db, counterparty_id=contraparte_id, user_id=current_user.id
+            )
+            if cp is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Contraparte no encontrada",
+                )
         items, total = TransactionRepository.list_filtered(
             db,
             user_id=current_user.id,
             account_id=account_id,
             category_id=category_id,
+            sub_category_id=sub_category_id,
+            contraparte_id=contraparte_id,
+            medio_pago=medio_pago,
             tipo=tipo,
             date_from=date_from,
             date_to=date_to,

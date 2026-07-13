@@ -253,3 +253,13 @@
 #   saldos no negativos, ingresos tempranos, efectivo acotado
 # - Tests: schema length, fondos insuficientes, Postgres column check
 #
+# ---------------------------------------------------------------------------
+# Paso 15 — Prioridad FE: reports v2 + filtros + kit frontend
+# ---------------------------------------------------------------------------
+# Reports summary ampliado:
+#   by_subcategory_*, by_medio_pago, by_counterparty (top 10),
+#   period_comparison (ventana actual vs anterior).
+# Transactions list: filtros medio_pago, contraparte_id, sub_category_id;
+#   orden documentado fecha DESC, id DESC.
+# Kit FE: docs/FRONTEND.md + Postman collection + scripts/export_openapi.py
+#

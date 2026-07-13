@@ -76,6 +76,9 @@ class TransactionRepository:
         user_id: int,
         account_id: int | None = None,
         category_id: int | None = None,
+        sub_category_id: int | None = None,
+        contraparte_id: int | None = None,
+        medio_pago: str | None = None,
         tipo: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
@@ -90,6 +93,12 @@ class TransactionRepository:
             filters.append(Transaction.account_id == account_id)
         if category_id is not None:
             filters.append(Transaction.category_id == category_id)
+        if sub_category_id is not None:
+            filters.append(Transaction.sub_category_id == sub_category_id)
+        if contraparte_id is not None:
+            filters.append(Transaction.contraparte_id == contraparte_id)
+        if medio_pago is not None:
+            filters.append(Transaction.medio_pago == medio_pago)
         if tipo is not None:
             filters.append(Transaction.tipo == tipo)
         if date_from is not None:

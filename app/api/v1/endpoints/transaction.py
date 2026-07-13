@@ -34,6 +34,9 @@ def list_transactions(
     offset: int = Query(default=0, ge=0),
     account_id: int | None = Query(default=None, gt=0),
     category_id: int | None = Query(default=None, gt=0),
+    sub_category_id: int | None = Query(default=None, gt=0),
+    contraparte_id: int | None = Query(default=None, gt=0),
+    medio_pago: Literal["cuenta", "efectivo"] | None = Query(default=None),
     tipo: Literal[
         "gasto", "ingreso", "transferencia_salida", "transferencia_entrada"
     ]
@@ -41,11 +44,19 @@ def list_transactions(
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
 ) -> Page[TransactionResponse]:
+    """
+    Listado propio, solo activos.
+
+    Orden estable: `fecha DESC`, luego `id DESC` (más recientes primero).
+    """
     return TransactionService.list_mine(
         db,
         current_user,
         account_id=account_id,
         category_id=category_id,
+        sub_category_id=sub_category_id,
+        contraparte_id=contraparte_id,
+        medio_pago=medio_pago,
         tipo=tipo,
         date_from=date_from,
         date_to=date_to,
