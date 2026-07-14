@@ -193,27 +193,35 @@ flowchart TB
 ## 8. Piezas HTTP montadas (`/api/v1`)
 
 ```mermaid
-mindmap
-  root((/api/v1))
-    health
-    auth
-      register login refresh logout
-      MFA admin
-    users
-    accounts
-    counterparties
-    budgets
-    categories
-    subcategories
-    transactions
-      CRUD
-      transfers
-      export CSV/JSON
-    reports
-      summary
-    webhooks
-      inbound HMAC
+flowchart TB
+  root["/api/v1"]
+
+  root --> health["GET /health"]
+  root --> auth["/auth"]
+  root --> users["/users"]
+  root --> accounts["/accounts"]
+  root --> counterparties["/counterparties"]
+  root --> budgets["/budgets"]
+  root --> categories["/categories"]
+  root --> subcategories["/subcategories"]
+  root --> transactions["/transactions"]
+  root --> reports["/reports"]
+  root --> webhooks["/webhooks"]
+
+  auth --> authOps["register · login · refresh · logout · me"]
+  auth --> authMfa["mfa setup / verify"]
+
+  budgets --> budgetOps["CRUD · status · reactivate"]
+
+  transactions --> txOps["CRUD"]
+  transactions --> txXfer["POST /transfers"]
+  transactions --> txExport["GET /export"]
+
+  reports --> summary["GET /summary"]
+  webhooks --> inbound["POST /inbound HMAC"]
 ```
+
+Montaje real: `app/api/v1/router.py`.
 
 ---
 
